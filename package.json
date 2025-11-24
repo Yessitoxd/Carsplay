@@ -1,0 +1,15 @@
+{
+  "name": "carsplay-auth",
+  "version": "1.0.0",
+  "description": "Simple auth backend for CarsPlay (demo)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node create_users.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "employees": [
+    {
+      "id": 1,
+      "username": "CarsPlay",
+      "password": "246810",
+      "role": "employee",
+      "created_at": "2025-11-23T00:00:00Z"
+    }
+  ]
+}
