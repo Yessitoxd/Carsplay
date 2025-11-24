@@ -13,7 +13,6 @@ Luego abre en tu navegador: `http://localhost:8000/index.html`
 
 ¿Deseas que añada validación JavaScript, integración con backend, o variaciones de color (por ejemplo fondo blanco puro vs. tarjeta blanca)?
 
----
 
 **Backend (Node) y despliegue en Render — instrucciones rápidas**
 
@@ -30,6 +29,33 @@ npm install;
 npm run seed    # lee employees.json y escribe users.json con contraseñas hasheadas
 npm start       # inicia el servidor en http://localhost:3000
 ```
+
+---
+
+MongoDB (migración rápida)
+
+He añadido soporte a MongoDB usando `mongoose` y agregué un script para crear los usuarios que solicitaste.
+
+Archivos nuevos/importantes:
+- `models/user.js` — modelo Mongoose para usuarios.
+- `db.js` — helper para conectar con `MONGODB_URI`.
+- `seed-db.js` — script que inserta los dos usuarios iniciales (empleado y admin).
+
+Cómo seedear la base de datos (local o en Render)
+1) Asegúrate de tener `MONGODB_URI` (por ejemplo un cluster en MongoDB Atlas).
+2) Ejecuta localmente:
+
+```powershell
+cd "C:/Users/larry/Downloads/Carsplay"
+SET MONGODB_URI="<tu_mongodb_uri>"
+node seed-db.js
+```
+
+3) En Render, añade la variable de entorno `MONGODB_URI` con tu conexión y en la sección Build Command usa `npm install && npm run seed` (si no quieres que el seed corra automáticamente en cada deploy, define `SKIP_SEED=true` y el seed será omitido).
+
+Notas de seguridad:
+- No subas credenciales reales al repo.
+- Protege la URI con las Environment Variables de Render.
 
 3) Probar login (ejemplo usando `curl`):
 
