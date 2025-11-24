@@ -20,13 +20,35 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
-      const data = await res.json();
-      if (res.ok && data.ok) {
+
+      // Handle non-JSON or empty responses safely
+      let data = null;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        try { data = await res.json(); } catch (e) { console.warn('Invalid JSON response', e); }
+      } else {
+        // If server returned text or empty body, read it for debugging
+        try { const text = await res.text(); console.warn('Non-JSON response:', text); } catch (e) { /* ignore */ }
+      }
+
+      if (res.ok && data && data.ok) {
         // Simple success action: redirect to dashboard
         window.location.href = (base || '') + '/dashboard.html';
-      } else {
-        alert('Credenciales inválidas');
+        return;
       }
+
+      // Specific HTTP status handling
+      if (res.status === 405) {
+        alert('Método no permitido (405) — inténtalo de nuevo o revisa el servidor.');
+        return;
+      }
+
+      if (data && data.error) {
+        alert('Error: ' + data.error);
+        return;
+      }
+
+      alert('Credenciales inválidas o respuesta inesperada del servidor');
     } catch (err) {
       console.error(err);
       alert('Error de conexión al servidor');
