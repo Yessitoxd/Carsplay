@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "seed": "node create_users.js"
+    "seed": "node seed-if-needed.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

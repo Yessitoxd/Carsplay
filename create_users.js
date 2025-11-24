@@ -30,4 +30,8 @@ function run() {
   console.log('Wrote', OUTPUT_FILE, 'with', users.length, 'user(s)');
 }
 
-run();
+if (require.main === module) {
+  run();
+}
+
+module.exports = { run };

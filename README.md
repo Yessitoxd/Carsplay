@@ -42,6 +42,34 @@ curl -X POST http://localhost:3000/api/login -H "Content-Type: application/json"
 	- En Render: New -> Web Service; conecta el repo; Build Command: `npm install`; Start Command: `node server.js`.
 	- Render usará la variable `PORT` automáticamente. Asegúrate de añadir secretos/env vars en Render si fuese necesario.
 
+---
+
+Controlar si se ejecuta el seed en el build (Render)
+
+Por defecto el `seed` corre durante el build para generar `users.json` a partir de `employees.json`.
+Si prefieres evitar que el seed se ejecute en un deploy (por ejemplo en producción), Render permite definir variables de entorno.
+
+Para saltar el seed en un deploy, añade la variable de entorno `SKIP_SEED=true` en la sección Environment de tu servicio en Render. El script de build debe continuar usando:
+
+```bash
+npm install && npm run seed
+```
+
+El script `seed` ahora ejecuta `seed-if-needed.js` que lee `SKIP_SEED`. Si `SKIP_SEED` está establecido a `true`, el seed se omite.
+
+Ejemplo (local) para omitir seed al correr el build:
+
+```powershell
+SET SKIP_SEED=true; npm install; npm run seed
+```
+
+En Linux/macOS la sintaxis sería:
+
+```bash
+SKIP_SEED=true npm install && npm run seed
+```
+
+
 Seguridad (importante):
 	- `create_users.js` hashea contraseñas usando `bcryptjs` y luego crea `users.json`.
 	- No subas `users.json` con contraseñas reales a repositorios públicos.
