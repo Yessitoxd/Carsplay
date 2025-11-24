@@ -8,6 +8,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Serve frontend static files from repository root (index.html, styles.css, login.js, dashboard.html)
+app.use(express.static(path.join(__dirname)));
+
 const USERS_FILE = path.join(__dirname, 'users.json');
 
 function loadUsers() {
