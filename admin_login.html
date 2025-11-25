@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Admin Login - CarsPlay</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="page">
+    <section class="card" aria-labelledby="admin-login-title">
+      <h1 id="admin-login-title">Acceso Administrador</h1>
+      <form class="login admin-login" action="#" method="post" novalidate>
+        <label for="a-username">Nombre de usuario</label>
+        <input id="a-username" name="username" type="text" placeholder="Admin usuario" required>
+        <label for="a-password">Contraseña</label>
+        <input id="a-password" name="password" type="password" placeholder="Contraseña" required>
+        <button class="btn primary" type="submit">Entrar</button>
+        <p style="margin-top:12px"><a href="index.html">Volver al login de empleados</a></p>
+      </form>
+    </section>
+  </main>
+  <script src="admin_login.js"></script>
+</body>
+</html>
