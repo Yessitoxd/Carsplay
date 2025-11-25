@@ -8,15 +8,35 @@
   <!-- layout/styles come from styles.css; inline white-box removed so grid can expand -->
 </head>
 <body>
-  <div class="box">
-    <h1>Panel del Empleado</h1>
-    <p>Bienvenido, este es el panel para empleados de CarsPlay.</p>
-    <p class="meta">Controla tiempo y ganancias por estación.</p>
-    <div class="grid" id="stations"></div>
+  <!-- Employee toggle (top-left) -->
+  <button id="employeeToggle" class="employee-toggle" aria-expanded="false"> <span id="employeeName">Empleado</span> ▾</button>
 
-    <hr>
-    <p><a href="index.html">Cerrar sesión</a></p>
-  </div>
+  <!-- Sidebar panel -->
+  <aside id="employeePanel" class="employee-panel" aria-hidden="true">
+    <div class="panel-inner">
+      <h2 id="panelUser">Empleado</h2>
+      <div class="panel-section">
+        <strong>Dinero obtenido:</strong>
+        <div id="panelTotal">C$ 0</div>
+      </div>
+      <div class="panel-actions">
+        <button id="logoutBtn" class="btn secondary">Cerrar sesión</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="content">
+    <div class="box">
+      <h1>Panel del Empleado</h1>
+      <p>Bienvenido, este es el panel para empleados de CarsPlay.</p>
+      <p class="meta">Controla tiempo y ganancias por estación.</p>
+      <div class="grid" id="stations"></div>
+
+      <hr>
+      <p><a href="index.html">Volver al login</a></p>
+    </div>
+  </main>
+
   <script src="employee.js"></script>
 </body>
 </html>

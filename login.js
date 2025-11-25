@@ -32,6 +32,10 @@
       }
 
       if (res.ok && data && data.ok) {
+        // persist logged-in user details so employee page can read them
+        try {
+          localStorage.setItem('carsplay_user', JSON.stringify({ username: data.username, role: data.role }));
+        } catch (e) { /* ignore */ }
         // Redirect based on role returned by server
         const role = (data.role || '').toLowerCase();
         if (role === 'employee' || role === 'empleado') {
