@@ -32,7 +32,13 @@
       }
 
       if (res.ok && data && data.ok) {
-        // Simple success action: redirect to dashboard
+        // Redirect based on role returned by server
+        const role = (data.role || '').toLowerCase();
+        if (role === 'employee' || role === 'empleado') {
+          window.location.href = (base || '') + '/employee.html';
+          return;
+        }
+        // default to admin dashboard
         window.location.href = (base || '') + '/dashboard.html';
         return;
       }
