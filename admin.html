@@ -7,25 +7,62 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <main class="page">
-    <section class="card" aria-labelledby="admin-panel-title">
-      <h1 id="admin-panel-title">Administrador</h1>
-      <p>Crear y administrar estaciones</p>
+  <main class="page admin-shell">
+    <aside class="admin-sidebar">
+      <div class="sidebar-inner">
+        <h3>Administración</h3>
+        <nav>
+          <ul>
+            <li><button class="side-btn" data-section="report">Reporte General</button></li>
+            <li><button class="side-btn" data-section="download">Descargar Reporte</button></li>
+            <li><button class="side-btn" data-section="addCarritos">Añadir Carritos</button></li>
+            <li><button class="side-btn" data-section="addPrices">Añadir Precios</button></li>
+            <li><button id="sidebarLogout" class="side-btn">Cerrar sesión</button></li>
+          </ul>
+        </nav>
+      </div>
+    </aside>
 
-      <form id="createStation">
-        <label for="s-name">Nombre</label>
-        <input id="s-name" name="name" required>
-        <label for="s-number">Número (opcional)</label>
-        <input id="s-number" name="number" type="number">
-        <label for="s-price">Precio</label>
-        <input id="s-price" name="price" type="number" value="0">
-        <button class="btn primary" type="submit">Crear estación</button>
-      </form>
+    <section class="admin-main">
+      <div class="central-card">
+        <!-- Central content area: sections swap here -->
+        <div id="section-report" class="admin-section">
+          <h2>Reporte General</h2>
+          <div id="reportContent">Cargando reporte...</div>
+        </div>
 
-      <hr>
-      <h2>Estaciones</h2>
-      <div id="stationList"></div>
-      <p><a href="index.html">Volver al login</a></p>
+        <div id="section-download" class="admin-section" style="display:none">
+          <h2>Descargar Reporte</h2>
+          <p>Pulsa para descargar un CSV con los registros de tiempo.</p>
+          <button id="downloadReport" class="btn primary">Descargar CSV</button>
+        </div>
+
+        <div id="section-addCarritos" class="admin-section" style="display:none">
+          <h2>Añadir Carritos</h2>
+          <form id="createStation">
+            <label for="s-name">Nombre</label>
+            <input id="s-name" name="name" required>
+            <label for="s-number">Número (opcional)</label>
+            <input id="s-number" name="number" type="number">
+            <label for="s-price">Precio</label>
+            <input id="s-price" name="price" type="number" value="0">
+            <button class="btn primary" type="submit">Crear estación</button>
+          </form>
+          <hr>
+          <h3>Estaciones existentes</h3>
+          <div id="stationList"></div>
+        </div>
+
+        <div id="section-addPrices" class="admin-section" style="display:none">
+          <h2>Añadir Precios</h2>
+          <p>Selecciona una estación y actualiza su precio.</p>
+          <div id="priceEditor">
+            <select id="priceStation"></select>
+            <input id="priceValue" type="number" value="0">
+            <button id="updatePrice" class="btn primary">Actualizar Precio</button>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
   <script src="admin.js"></script>

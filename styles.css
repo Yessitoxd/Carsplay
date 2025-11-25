@@ -122,3 +122,18 @@ body.admin-auth .btn.primary{background:var(--accent);box-shadow:none;color:#fff
 body.admin-auth .btn.primary:active{transform:translateY(1px)}
 body.admin-auth .btn.primary{padding:12px}
 body.admin-auth .card{border-radius:12px}
+
+/* Admin panel layout */
+.admin-shell{display:flex;gap:18px;align-items:stretch}
+.admin-sidebar{width:220px;background:transparent}
+.admin-sidebar .sidebar-inner{position:sticky;top:20px;padding:16px}
+.admin-sidebar h3{margin:0 0 12px 0;color:var(--muted)}
+.admin-sidebar ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+.side-btn{display:block;width:100%;text-align:left;padding:10px 12px;border-radius:8px;border:1px solid rgba(0,0,0,0.04);background:rgba(255,255,255,0.98);cursor:pointer}
+.side-btn:hover{background:rgba(0,0,0,0.02)}
+.admin-main{flex:1}
+.central-card{background:var(--card);border-radius:12px;padding:20px;box-shadow:0 20px 40px rgba(0,0,0,0.18);border:1px solid rgba(0,0,0,0.06)}
+.admin-section{padding:8px}
+.no-stations{color:var(--muted);padding:12px}
+.station-row{padding:8px 6px;border-bottom:1px solid rgba(0,0,0,0.04)}
+.admin-shell .box{box-shadow:none;border:none;background:transparent;padding:0}
