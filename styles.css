@@ -112,13 +112,13 @@ body.panel-open .content{margin-left:260px}
 .panel-section{font-size:14px}
 .panel-actions{margin-top:12px}
 
-/* Admin auth page styles (neon card) */
-body.admin-auth{background:linear-gradient(180deg,#3b0f6f 0%,#6b2bb8 100%);height:100vh;display:flex;align-items:center;justify-content:center}
-body.admin-auth .card{width:420px;padding:34px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02));box-shadow:0 18px 40px rgba(11,7,39,0.5);border:2px solid rgba(0,255,230,0.25)}
-body.admin-auth .card h1{color:#fff;text-align:center}
-body.admin-auth label{color:#dfe6ff}
+/* Admin auth page styles - white background as requested */
+body.admin-auth{background:#ffffff;min-height:100vh;display:flex;align-items:center;justify-content:center}
+body.admin-auth .card{width:420px;padding:34px;border-radius:12px;background:var(--card);box-shadow:0 12px 30px rgba(15,23,42,0.06);border:1px solid var(--border)}
+body.admin-auth .card h1{color:var(--accent);text-align:center}
+body.admin-auth label{color:var(--muted)}
 body.admin-auth input{background:#fff;padding:10px;border-radius:8px}
-body.admin-auth .btn.primary{background:linear-gradient(90deg,#06b6d4,#7c3aed);box-shadow:0 8px 30px rgba(124,58,237,0.24);color:#fff;border:none;font-size:16px}
+body.admin-auth .btn.primary{background:var(--accent);box-shadow:none;color:#fff;border:none;font-size:16px}
 body.admin-auth .btn.primary:active{transform:translateY(1px)}
-body.admin-auth .btn.primary{padding:14px}
-body.admin-auth .card{border-radius:14px}
+body.admin-auth .btn.primary{padding:12px}
+body.admin-auth .card{border-radius:12px}
