@@ -9,9 +9,31 @@
   // Track state per card id
   const state = {};
 
+  function createCardElement(station, idx){
+    const id = station._id || `s-${idx}`;
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.dataset.id = id;
+
+    div.innerHTML = `
+      <div class="card-head"><div class="img">Imagen</div><h3>${station.name || 'Carrito #' + (idx+1)}</h3></div>
+      <div class="times"><div class="elapsed">00:00:00</div><div class="remaining">00:00:00</div></div>
+      <div class="bar"><div class="bar-fill" style="width:0%"></div></div>
+      <div class="controls"><select class="duration">
+          <option value="15">15 min</option>
+          <option value="30" selected>30 min</option>
+          <option value="45">45 min</option>
+          <option value="60">60 min</option>
+        </select><div class="price">C$ <span class="amount">${station.price || 0}</span></div></div>
+      <div class="buttons"><button class="start">Iniciar</button><button class="reset">Restablecer</button></div>
+    `;
+
+    return div;
+  }
+
   function initCard(card){
     const id = card.dataset.id;
-    state[id] = { timer: null, elapsed: 0, total: 0 };
+    if (!state[id]) state[id] = { timer: null, elapsed: 0, total: 0 };
 
     const startBtn = card.querySelector('.start');
     const resetBtn = card.querySelector('.reset');
@@ -38,8 +60,7 @@
         clearInterval(s.timer);
         s.timer = null;
         startBtn.textContent = 'Iniciar';
-        // calculate a simple earned amount: e.g., 1 currency unit per 15 minutes
-        const earned = Math.round((s.total/60) * 1); // 1 per hour roughly
+        const earned = Math.round((s.total/60) * 1);
         amountEl.textContent = earned;
       }
     }
@@ -54,7 +75,6 @@
         s.timer = setInterval(tick, 1000);
         startBtn.textContent = 'Pausar';
       } else {
-        // pause
         clearInterval(s.timer);
         s.timer = null;
         startBtn.textContent = 'Reanudar';
@@ -70,12 +90,32 @@
       updateUI();
     });
 
-    // initial UI
     updateUI();
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.card[data-id]').forEach(initCard);
-  });
+  async function loadStations(){
+    let stations = null;
+    try {
+      const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+      const res = await fetch((base || '') + '/api/stations');
+      if (res.ok){ stations = await res.json(); }
+    } catch (e){ /* ignore */ }
+
+    const container = document.getElementById('stations');
+    container.innerHTML = '';
+
+    if (!stations || !Array.isArray(stations) || stations.length === 0){
+      // fallback: create 6 default stations
+      stations = Array.from({length:6}).map((_,i)=>({ name: `Carrito #${i+1}`, price: 0 }));
+    }
+
+    stations.forEach((s, i)=>{
+      const el = createCardElement(s, i);
+      container.appendChild(el);
+      initCard(el);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', loadStations);
 
 })();

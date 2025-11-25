@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 
 const { connect } = require('./db');
 const User = require('./models/user');
+const Station = require('./models/station');
 
 const app = express();
 app.use(cors());
@@ -38,6 +39,31 @@ app.post('/api/login', async (req, res) => {
     return res.json({ ok: true, username: user.username, role: user.role || 'employee' });
   } catch (err) {
     console.error('Login error', err);
+    return res.status(500).json({ ok: false, error: 'server_error' });
+  }
+});
+
+// Stations endpoints (admin can create, employees fetch)
+app.get('/api/stations', async (req, res) => {
+  try {
+    const stations = await Station.find({}).sort({ number: 1 }).exec();
+    return res.json(stations);
+  } catch (err) {
+    console.error('Stations fetch error', err);
+    return res.status(500).json({ ok: false, error: 'server_error' });
+  }
+});
+
+app.post('/api/stations', async (req, res) => {
+  // NOTE: no auth yet — restrict in future
+  const { name, number, image, price } = req.body || {};
+  if (!name) return res.status(400).json({ ok: false, error: 'missing_name' });
+  try {
+    const station = new Station({ name, number, image, price });
+    await station.save();
+    return res.status(201).json(station);
+  } catch (err) {
+    console.error('Stations create error', err);
     return res.status(500).json({ ok: false, error: 'server_error' });
   }
 });
