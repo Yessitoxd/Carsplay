@@ -53,6 +53,7 @@ body{
 .login input:focus{outline:none; box-shadow:0 0 0 4px rgba(107,70,255,0.06); border-color:var(--accent)}
 
 .btn{display:block; width:100%; padding:12px 16px; border-radius:8px; font-weight:600; font-size:15px; cursor:pointer; margin-top:16px}
+.btn{ text-align:center }
 .btn.primary{background:var(--accent); color:#fff; border:none}
 .btn.primary:active{transform:translateY(1px)}
 .btn.secondary{background:transparent; border:1px solid var(--border); color:#111827}
@@ -110,3 +111,14 @@ label[for]{cursor:text}
 body.panel-open .content{margin-left:260px}
 .panel-section{font-size:14px}
 .panel-actions{margin-top:12px}
+
+/* Admin auth page styles (neon card) */
+body.admin-auth{background:linear-gradient(180deg,#3b0f6f 0%,#6b2bb8 100%);height:100vh;display:flex;align-items:center;justify-content:center}
+body.admin-auth .card{width:420px;padding:34px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02));box-shadow:0 18px 40px rgba(11,7,39,0.5);border:2px solid rgba(0,255,230,0.25)}
+body.admin-auth .card h1{color:#fff;text-align:center}
+body.admin-auth label{color:#dfe6ff}
+body.admin-auth input{background:#fff;padding:10px;border-radius:8px}
+body.admin-auth .btn.primary{background:linear-gradient(90deg,#06b6d4,#7c3aed);box-shadow:0 8px 30px rgba(124,58,237,0.24);color:#fff;border:none;font-size:16px}
+body.admin-auth .btn.primary:active{transform:translateY(1px)}
+body.admin-auth .btn.primary{padding:14px}
+body.admin-auth .card{border-radius:14px}
