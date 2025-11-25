@@ -15,9 +15,76 @@
   <div class="box">
     <h1>Panel del Empleado</h1>
     <p>Bienvenido, este es el panel para empleados de CarsPlay.</p>
-    <p class="meta">Aquí puedes mostrar tareas, turnos, o la información que necesites.</p>
+    <p class="meta">Controla tiempo y ganancias por estación.</p>
+    <div class="grid" id="stations">
+      <!-- Six sample station cards -->
+      <!-- Card template: data-id attribute used by JS -->
+      <div class="card" data-id="1">
+        <div class="card-head"><div class="img">Imagen</div><h3>Carrito #1</h3></div>
+        <div class="times">
+          <div class="elapsed">00:00:00</div>
+          <div class="remaining">00:00:00</div>
+        </div>
+        <div class="bar"><div class="bar-fill" style="width:0%"></div></div>
+        <div class="controls">
+          <select class="duration">
+            <option value="15">15 min</option>
+            <option value="30" selected>30 min</option>
+            <option value="45">45 min</option>
+            <option value="60">60 min</option>
+          </select>
+          <div class="price">C$ <span class="amount">0</span></div>
+        </div>
+        <div class="buttons">
+          <button class="start">Iniciar</button>
+          <button class="reset">Restablecer</button>
+        </div>
+      </div>
+
+      <div class="card" data-id="2">
+        <div class="card-head"><div class="img">Imagen</div><h3>Carrito #2</h3></div>
+        <div class="times"><div class="elapsed">00:00:00</div><div class="remaining">00:00:00</div></div>
+        <div class="bar"><div class="bar-fill" style="width:0%"></div></div>
+        <div class="controls"><select class="duration"><option value="15">15 min</option><option value="30" selected>30 min</option><option value="45">45 min</option><option value="60">60 min</option></select><div class="price">C$ <span class="amount">0</span></div></div>
+        <div class="buttons"><button class="start">Iniciar</button><button class="reset">Restablecer</button></div>
+      </div>
+
+      <div class="card" data-id="3">
+        <div class="card-head"><div class="img">Imagen</div><h3>Carrito #3</h3></div>
+        <div class="times"><div class="elapsed">00:00:00</div><div class="remaining">00:00:00</div></div>
+        <div class="bar"><div class="bar-fill" style="width:0%"></div></div>
+        <div class="controls"><select class="duration"><option value="15">15 min</option><option value="30" selected>30 min</option><option value="45">45 min</option><option value="60">60 min</option></select><div class="price">C$ <span class="amount">0</span></div></div>
+        <div class="buttons"><button class="start">Iniciar</button><button class="reset">Restablecer</button></div>
+      </div>
+
+      <div class="card" data-id="4">
+        <div class="card-head"><div class="img">Imagen</div><h3>Carrito #4</h3></div>
+        <div class="times"><div class="elapsed">00:00:00</div><div class="remaining">00:00:00</div></div>
+        <div class="bar"><div class="bar-fill" style="width:0%"></div></div>
+        <div class="controls"><select class="duration"><option value="15">15 min</option><option value="30" selected>30 min</option><option value="45">45 min</option><option value="60">60 min</option></select><div class="price">C$ <span class="amount">0</span></div></div>
+        <div class="buttons"><button class="start">Iniciar</button><button class="reset">Restablecer</button></div>
+      </div>
+
+      <div class="card" data-id="5">
+        <div class="card-head"><div class="img">Imagen</div><h3>Carrito #5</h3></div>
+        <div class="times"><div class="elapsed">00:00:00</div><div class="remaining">00:00:00</div></div>
+        <div class="bar"><div class="bar-fill" style="width:0%"></div></div>
+        <div class="controls"><select class="duration"><option value="15">15 min</option><option value="30" selected>30 min</option><option value="45">45 min</option><option value="60">60 min</option></select><div class="price">C$ <span class="amount">0</span></div></div>
+        <div class="buttons"><button class="start">Iniciar</button><button class="reset">Restablecer</button></div>
+      </div>
+
+      <div class="card" data-id="6">
+        <div class="card-head"><div class="img">Imagen</div><h3>Carrito #6</h3></div>
+        <div class="times"><div class="elapsed">00:00:00</div><div class="remaining">00:00:00</div></div>
+        <div class="bar"><div class="bar-fill" style="width:0%"></div></div>
+        <div class="controls"><select class="duration"><option value="15">15 min</option><option value="30" selected>30 min</option><option value="45">45 min</option><option value="60">60 min</option></select><div class="price">C$ <span class="amount">0</span></div></div>
+        <div class="buttons"><button class="start">Iniciar</button><button class="reset">Restablecer</button></div>
+      </div>
+    </div>
+
     <hr>
     <p><a href="index.html">Cerrar sesión</a></p>
   </div>
+  <script src="employee.js"></script>
 </body>
 </html>

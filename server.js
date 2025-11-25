@@ -13,6 +13,11 @@ app.use(express.json());
 // Respond to favicon requests with no content to avoid 404 errors in the browser console
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
+// Serve employee panel explicitly in case static hosting misses the file
+app.get('/employee.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'employee.html'));
+});
+
 // Serve frontend static files from repository root (index.html, styles.css, login.js, dashboard.html)
 app.use(express.static(path.join(__dirname)));
 
