@@ -331,11 +331,21 @@
       const reader = new FileReader();
       reader.onload = () => {
         cropImage.src = reader.result;
-        cropPanel.style.display = '';
+        // When image loads, if it's already square (1:1) accept it immediately
         preparedBlob = null;
         cropImage.onload = () => {
           imgW = cropImage.naturalWidth; imgH = cropImage.naturalHeight;
-          // initial scale so image covers viewport
+          if (imgW === imgH) {
+            // image is already 1:1 — accept original file as preparedBlob and skip crop panel
+            preparedBlob = file;
+            // show final thumbnail (use reader.result)
+            const prev = document.getElementById('imagePreview'); prev.innerHTML = '';
+            const thumb = new Image(); thumb.src = reader.result; thumb.style.width = '120px'; thumb.style.height = '120px'; thumb.style.objectFit = 'cover'; thumb.style.borderRadius = '6px'; prev.appendChild(thumb);
+            cropPanel.style.display = 'none';
+            return;
+          }
+          // initial scale so image covers viewport for non-square images
+          cropPanel.style.display = '';
           const vp = cropViewport.getBoundingClientRect();
           const fit = Math.max(vp.width / imgW, vp.height / imgH);
           scale = Math.max(fit, 1);
