@@ -174,6 +174,20 @@ body.admin-auth .card{border-radius:12px}
 #imagePreview{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:auto;max-width:120px;height:auto;display:flex;align-items:center;justify-content:center}
 #imagePreview img{width:120px;max-width:100%;height:auto;max-height:calc(100% - 8px);object-fit:cover;border-radius:6px;border:1px solid rgba(0,0,0,0.04);display:block}
 
+/* Admin forms: larger inputs and rounded corners */
+.admin-section input[type="number"], .admin-section input[type="text"], .admin-section select, .admin-section .time-form input {
+  padding: 12px 14px; border-radius: 12px; border: 1px solid #e6e9ee; font-size: 15px; background: #fff;
+}
+.admin-section .time-form label{font-weight:600; margin-right:6px}
+.admin-section .modal-card{border-radius:14px}
+.modal-card input{padding:10px; border-radius:8px}
+
+/* Smaller rounded button for the Add tariff action */
+.btn.small{padding:8px 10px; border-radius:12px; font-size:14px}
+
+/* Ensure primary buttons are rounded in admin views */
+.admin-section .btn.primary{border-radius:12px}
+
 /* Admin panel layout */
 .admin-shell{display:flex;gap:18px;align-items:stretch}
 .admin-sidebar{width:220px;background:transparent}

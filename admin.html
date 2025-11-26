@@ -123,26 +123,17 @@
           <h2>Tarifas por Tiempo</h2>
           <p>Crea tarifas indicando cuántos minutos equivalen a cuánto dinero. Estas opciones se mostrarán en el panel de empleados como duraciones disponibles.</p>
 
-          <form id="createTimeRate" style="margin-top:8px;display:flex;gap:8px;align-items:center">
+          <form id="createTimeRate" class="time-form" style="margin-top:8px;display:flex;gap:8px;align-items:center">
             <label for="tr-minutes">Minutos</label>
-            <input id="tr-minutes" type="number" min="1" placeholder="Min" required style="width:80px">
+            <input id="tr-minutes" type="number" min="1" placeholder="Min" required style="width:110px">
             <label for="tr-amount">C$</label>
-            <input id="tr-amount" type="number" min="0" step="0.1" placeholder="Monto" required style="width:120px">
-            <button class="btn primary" type="submit">Agregar tarifa</button>
+            <input id="tr-amount" type="number" min="0" step="0.1" placeholder="Monto" required style="width:140px">
+            <button class="btn primary small" type="submit">Agregar</button>
           </form>
 
           <hr>
           <h3>Tarifas existentes</h3>
           <div id="timeRateList" class="station-list-scroll"></div>
-
-          <hr>
-          <h2>Editor de Precios por Carrito (opcional)</h2>
-          <p>Si deseas mantener un precio base por carrito, puedes actualizarlo aquí (no afecta a las tarifas por tiempo).</p>
-          <div id="priceEditor">
-            <select id="priceStation"></select>
-            <input id="priceValue" type="number" value="0">
-            <button id="updatePrice" class="btn primary">Actualizar Precio</button>
-          </div>
         </div>
       </div>
     </section>

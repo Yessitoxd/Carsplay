@@ -358,7 +358,7 @@
         const sec = btn.dataset.section;
         showSection(sec);
         if (sec === 'addCarritos') loadStations();
-        if (sec === 'addPrices') { populatePriceEditor(); loadTimeRates(); }
+        if (sec === 'addPrices') { loadTimeRates(); }
       });
     });
     document.getElementById('sidebarLogout').addEventListener('click', () => {
