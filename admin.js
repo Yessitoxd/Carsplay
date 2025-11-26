@@ -283,17 +283,38 @@
   }
 
   async function editTimeRate(rate){
-    const newM = parseInt(prompt('Minutos:', String(rate.minutes)),10);
-    if (isNaN(newM) || newM <= 0) return;
-    const newA = parseFloat(prompt('Monto C$:', String(rate.amount)));
-    if (isNaN(newA) || newA < 0) return;
+    // open modal to edit rate
+    openTimeRateModal(rate);
+  }
+
+  // Modal handling for time rate edit
+  let currentEditingRate = null;
+  function openTimeRateModal(rate){
+    currentEditingRate = rate || null;
+    const modal = document.getElementById('timeRateModal');
+    const mins = document.getElementById('tr-edit-minutes');
+    const amt = document.getElementById('tr-edit-amount');
+    mins.value = rate ? String(rate.minutes) : '';
+    amt.value = rate ? String(rate.amount) : '';
+    modal.style.display = '';
+  }
+
+  async function saveTimeRateFromModal(ev){
+    ev.preventDefault();
+    if (!currentEditingRate) return;
+    const mins = parseInt(document.getElementById('tr-edit-minutes').value,10);
+    const amt = parseFloat(document.getElementById('tr-edit-amount').value);
+    if (isNaN(mins) || mins <= 0) { showToast('Minutos inválidos', 3000, 'warning'); return; }
+    if (isNaN(amt) || amt < 0) { showToast('Monto inválido', 3000, 'warning'); return; }
     try {
       const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
       const token = localStorage.getItem('carsplay_token');
       const headers = Object.assign({ 'Content-Type': 'application/json' }, token ? { 'Authorization': 'Bearer ' + token } : {});
-      const res = await fetch((base || '') + '/api/time/rates/' + rate._id, { method: 'PUT', headers, body: JSON.stringify({ minutes: newM, amount: newA }) });
+      const res = await fetch((base || '') + '/api/time/rates/' + currentEditingRate._id, { method: 'PUT', headers, body: JSON.stringify({ minutes: mins, amount: amt }) });
       if (!res.ok) { const txt = await res.text(); showToast('Error: ' + txt, 4000, 'error'); return; }
       showToast('Tarifa actualizada', 3000, 'success');
+      document.getElementById('timeRateModal').style.display = 'none';
+      currentEditingRate = null;
       await loadTimeRates();
     } catch (e){ console.error(e); showToast('Error actualizando tarifa', 3000, 'error'); }
   }
@@ -351,6 +372,11 @@
     if (updateBtn) updateBtn.addEventListener('click', updatePrice);
     const createTR = document.getElementById('createTimeRate');
     if (createTR) createTR.addEventListener('submit', createTimeRate);
+    // wire modal save/cancel for time rate editing
+    const timeRateForm = document.getElementById('timeRateForm');
+    if (timeRateForm) timeRateForm.addEventListener('submit', saveTimeRateFromModal);
+    const cancelTR = document.getElementById('cancelTimeRate');
+    if (cancelTR) cancelTR.addEventListener('click', () => { document.getElementById('timeRateModal').style.display = 'none'; currentEditingRate = null; });
     // image input and dropzone behavior
     const imgInput = document.getElementById('s-image');
     const dropzone = document.getElementById('imageDropzone');

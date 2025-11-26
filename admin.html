@@ -99,6 +99,26 @@
           </div>
         </div>
 
+        <!-- Time rate edit modal -->
+        <div id="timeRateModal" class="modal" style="display:none">
+          <div class="modal-backdrop"></div>
+          <div class="modal-card">
+            <h3>Editar Tarifa</h3>
+            <div class="modal-body">
+              <form id="timeRateForm">
+                <label for="tr-edit-minutes">Minutos</label>
+                <input id="tr-edit-minutes" type="number" min="1" required>
+                <label for="tr-edit-amount">Monto (C$)</label>
+                <input id="tr-edit-amount" type="number" min="0" step="0.1" required>
+                <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+                  <button id="cancelTimeRate" class="btn secondary" type="button">Cancelar</button>
+                  <button id="saveTimeRate" class="btn primary" type="submit">Guardar</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
         <div id="section-addPrices" class="admin-section" style="display:none">
           <h2>Tarifas por Tiempo</h2>
           <p>Crea tarifas indicando cuántos minutos equivalen a cuánto dinero. Estas opciones se mostrarán en el panel de empleados como duraciones disponibles.</p>
