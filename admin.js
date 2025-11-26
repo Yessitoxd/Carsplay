@@ -58,12 +58,16 @@
       return;
     }
     try {
-      // read image file, crop/resize to square on client side, then send base64 image
-      const imgData = await fileToSquareDataUrl(file, 512);
+      // read image file, crop/resize to square on client side, then send as Blob via FormData
+      const canvasDataUrl = await fileToSquareDataUrl(file, 512);
+      const blob = dataURLToBlob(canvasDataUrl);
+      const form = new FormData();
+      form.append('name', name);
+      form.append('number', number);
+      form.append('image', blob, `carrito-${Date.now()}.jpg`);
       const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : 'https://carsplay.onrender.com';
       const res = await fetch((base || '') + '/api/stations', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, number, image: imgData })
+        method: 'POST', body: form
       });
       if (!res.ok) { const txt = await res.text(); showToast('Error: ' + txt, 4000, 'error'); return; }
       // success
@@ -97,6 +101,16 @@
       };
       reader.readAsDataURL(file);
     });
+  }
+
+  function dataURLToBlob(dataURL){
+    const parts = dataURL.split(',');
+    const m = parts[0].match(/:(.*?);/);
+    const mime = m ? m[1] : 'image/jpeg';
+    const bstr = atob(parts[1]);
+    let n = bstr.length; const u8 = new Uint8Array(n);
+    while(n--) u8[n] = bstr.charCodeAt(n);
+    return new Blob([u8], { type: mime });
   }
 
   // small toast utility (type: success|error|warning)

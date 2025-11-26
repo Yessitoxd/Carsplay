@@ -8,8 +8,27 @@ const User = require('./models/user');
 const Station = require('./models/station');
 
 const app = express();
+const fs = require('fs');
+const multer = require('multer');
 app.use(cors());
 app.use(express.json());
+
+// ensure uploads directory exists
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+// configure multer
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) { cb(null, uploadsDir); },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname) || '.jpg';
+    cb(null, `${Date.now()}-${Math.round(Math.random()*1e6)}${ext}`);
+  }
+});
+const upload = multer({ storage });
+
+// serve uploads statically
+app.use('/uploads', express.static(uploadsDir));
 
 // Respond to favicon requests with no content to avoid 404 errors in the browser console
 app.get('/favicon.ico', (req, res) => res.status(204).end());
@@ -54,12 +73,18 @@ app.get('/api/stations', async (req, res) => {
   }
 });
 
-app.post('/api/stations', async (req, res) => {
+// Create station with optional image upload (multipart/form-data)
+app.post('/api/stations', upload.single('image'), async (req, res) => {
   // NOTE: no auth yet — restrict in future
-  const { name, number, image, price } = req.body || {};
-  if (!name) return res.status(400).json({ ok: false, error: 'missing_name' });
   try {
-    const station = new Station({ name, number, image, price });
+    const name = req.body.name || 'Carrito';
+    const number = req.body.number ? Number(req.body.number) : undefined;
+    if (!number && number !== 0) return res.status(400).json({ ok: false, error: 'missing_number' });
+    let imagePath = undefined;
+    if (req.file && req.file.filename) {
+      imagePath = '/uploads/' + req.file.filename;
+    }
+    const station = new Station({ name, number, image: imagePath });
     await station.save();
     return res.status(201).json(station);
   } catch (err) {
