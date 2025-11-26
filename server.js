@@ -10,25 +10,14 @@ const Station = require('./models/station');
 const app = express();
 const fs = require('fs');
 const multer = require('multer');
+const mongoose = require('mongoose');
 app.use(cors());
 app.use(express.json());
 
-// ensure uploads directory exists
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+// configure multer to use memory storage — we'll push files into GridFS
+const upload = multer({ storage: multer.memoryStorage() });
 
-// configure multer
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) { cb(null, uploadsDir); },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname) || '.jpg';
-    cb(null, `${Date.now()}-${Math.round(Math.random()*1e6)}${ext}`);
-  }
-});
-const upload = multer({ storage });
-
-// serve uploads statically
-app.use('/uploads', express.static(uploadsDir));
+// note: we previously served /uploads from disk; switching to GridFS will serve via `/api/uploads/:id`
 
 // Respond to favicon requests with no content to avoid 404 errors in the browser console
 app.get('/favicon.ico', (req, res) => res.status(204).end());
@@ -80,16 +69,50 @@ app.post('/api/stations', upload.single('image'), async (req, res) => {
     const name = req.body.name || 'Carrito';
     const number = req.body.number ? Number(req.body.number) : undefined;
     if (!number && number !== 0) return res.status(400).json({ ok: false, error: 'missing_number' });
-    let imagePath = undefined;
-    if (req.file && req.file.filename) {
-      imagePath = '/uploads/' + req.file.filename;
+
+    let imageUrl = undefined;
+    // if file buffer present, stream to GridFS and build image URL
+    if (req.file && req.file.buffer) {
+      if (!mongoose.connection || !mongoose.connection.db) {
+        console.error('MongoDB not connected yet');
+        return res.status(500).json({ ok: false, error: 'db_not_ready' });
+      }
+      const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
+      const filename = req.file.originalname || (`upload-${Date.now()}.jpg`);
+      const uploadStream = bucket.openUploadStream(filename, { contentType: req.file.mimetype });
+      // write buffer then wait finish
+      await new Promise((resolve, reject) => {
+        uploadStream.on('error', (err) => reject(err));
+        uploadStream.on('finish', () => resolve());
+        uploadStream.end(req.file.buffer);
+      });
+      const fileId = uploadStream.id;
+      imageUrl = `/api/uploads/${fileId}`;
     }
-    const station = new Station({ name, number, image: imagePath });
+
+    const station = new Station({ name, number, image: imageUrl });
     await station.save();
     return res.status(201).json(station);
   } catch (err) {
     console.error('Stations create error', err);
     return res.status(500).json({ ok: false, error: 'server_error' });
+  }
+});
+
+// Serve images stored in GridFS: /api/uploads/:id
+app.get('/api/uploads/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!id) return res.status(400).end();
+    if (!mongoose.connection || !mongoose.connection.db) return res.status(500).end();
+    const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
+    const _id = new mongoose.Types.ObjectId(id);
+    const download = bucket.openDownloadStream(_id);
+    download.on('error', (err) => { res.status(404).end(); });
+    download.pipe(res);
+  } catch (err) {
+    console.error('GridFS serve error', err);
+    return res.status(500).end();
   }
 });
 
