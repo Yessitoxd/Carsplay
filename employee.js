@@ -32,7 +32,15 @@
       const simple = {};
       Object.keys(state).forEach(id => {
         const s = state[id];
-        simple[id] = { running: !!s.running, startedAt: s.startedAt || null, accumulated: s.accumulated || 0, total: s.total || 0, amount: s.amount || 0 };
+        simple[id] = {
+          running: !!s.running,
+          startedAt: s.startedAt || null,
+          accumulated: s.accumulated || 0,
+          total: s.total || 0,
+          plannedAmount: s.plannedAmount || 0,
+          sessions: s.sessions || [],
+          currentSession: s.currentSession !== undefined ? s.currentSession : null
+        };
       });
       localStorage.setItem(STATE_KEY, JSON.stringify(simple));
     } catch (e) { console.warn('Could not save state', e); }
@@ -84,14 +92,16 @@
   function initCard(card, persisted){
     const id = card.dataset.id;
     // initialize state for this card
-    if (!state[id]) state[id] = { running: false, startedAt: null, accumulated: 0, total: 0, amount: 0, timer: null };
+    if (!state[id]) state[id] = { running: false, startedAt: null, accumulated: 0, total: 0, amount: 0, timer: null, sessions: [], currentSession: null };
     const s = state[id];
     if (persisted){
       s.running = !!persisted.running;
       s.startedAt = persisted.startedAt || null;
       s.accumulated = persisted.accumulated || 0;
       s.total = persisted.total || 0;
-      s.amount = persisted.amount || 0;
+      s.plannedAmount = persisted.plannedAmount || 0;
+      s.sessions = Array.isArray(persisted.sessions) ? persisted.sessions : [];
+      s.currentSession = persisted.currentSession !== undefined ? persisted.currentSession : null;
     }
 
     const startBtn = card.querySelector('.start');
@@ -118,7 +128,14 @@
       remainingEl.textContent = fmt(remaining);
       const pct = s.total > 0 ? Math.min(100, Math.round((elapsed / s.total) * 100)) : 0;
       fill.style.width = pct + '%';
-      amountEl.textContent = s.amount || 0;
+      // show planned/current session amount (not included in panel total until settled)
+      let displayAmt = 0;
+      if (s.currentSession !== null && s.sessions && s.sessions[s.currentSession]) {
+        displayAmt = s.sessions[s.currentSession].amount || s.plannedAmount || 0;
+      } else {
+        displayAmt = s.plannedAmount || 0;
+      }
+      amountEl.textContent = displayAmt;
     }
 
     // initialize total/amount based on selected duration option
@@ -128,7 +145,9 @@
       const opt = durationSel.selectedOptions && durationSel.selectedOptions[0];
       const amt = opt && opt.dataset && opt.dataset.amount !== undefined ? parseFloat(opt.dataset.amount) : null;
       s.total = mins * 60;
-      if (amt !== null) s.amount = amt; // use rate amount when provided
+      // planned amount for display, but not settled until session finalizes
+      if (amt !== null) s.plannedAmount = amt;
+      else s.plannedAmount = 0;
     }
 
     // when user changes duration, update totals
@@ -142,17 +161,23 @@
     }
 
     function finishTimer(){
-      // compute final amount (simple formula: 1 per hour)
-      s.amount = Math.round((s.total/60) * 1);
+      // mark current session as ended
+      if (s.currentSession !== null) {
+        const sess = s.sessions[s.currentSession];
+        sess.end = Date.now();
+        sess.duration = s.total; // finished full time
+        // amount: use planned amount or a computed fallback
+        sess.amount = (sess.amount !== undefined) ? sess.amount : (s.plannedAmount || Math.round((s.total/60) * 1));
+        sess.settled = false; // not yet paid until Finalizar or Detener
+      }
       s.running = false; s.startedAt = null; s.accumulated = s.total;
       if (s.timer){ clearInterval(s.timer); s.timer = null; }
       startBtn.textContent = 'Iniciar';
-      // show finish button and start alarm loop
-      try {
-        if (alarmAudio) { alarmAudio.currentTime = 0; alarmAudio.play().catch(()=>{}); }
-      } catch(e){}
+      // show finish and another-round buttons and start alarm loop
+      try { if (alarmAudio) { alarmAudio.currentTime = 0; alarmAudio.play().catch(()=>{}); } } catch(e){}
       if (finishBtn) { finishBtn.style.display = ''; }
-      // disable start until finalized
+      if (changeBtn) { changeBtn.style.display = ''; changeBtn.textContent = 'Otra ronda'; }
+      // disable start until finalized or stopped
       startBtn.disabled = true;
       saveStateToStorage();
       updateUI();
@@ -172,6 +197,8 @@
       // start interval
       if (!s.timer) s.timer = setInterval(tick, 1000);
       startBtn.textContent = 'Pausar';
+      if (stopBtn) stopBtn.style.display = '';
+      if (changeBtn) changeBtn.style.display = '';
     }
 
     // if timer already completed, ensure UI shows amount
@@ -188,6 +215,12 @@
         // start or resume
         const mins = parseInt(durationSel.value, 10) || 0;
         if (!s.total) s.total = mins * 60;
+        // start a new session record if none active
+        if (s.currentSession === null) {
+          const sess = { start: Date.now(), minutes: mins, amount: (durationSel.selectedOptions && durationSel.selectedOptions[0] && durationSel.selectedOptions[0].dataset.amount) ? parseFloat(durationSel.selectedOptions[0].dataset.amount) : null, settled: false };
+          s.sessions.push(sess);
+          s.currentSession = s.sessions.length - 1;
+        }
         s.startedAt = Date.now();
         s.running = true;
         if (!s.timer) s.timer = setInterval(tick, 1000);
@@ -198,7 +231,15 @@
         saveStateToStorage();
       } else {
         // pause
-        if (s.startedAt) s.accumulated += Math.floor((Date.now() - s.startedAt) / 1000);
+        if (s.startedAt) {
+          const delta = Math.floor((Date.now() - s.startedAt) / 1000);
+          s.accumulated += delta;
+          // update current session accumulated time
+          if (s.currentSession !== null) {
+            const sess = s.sessions[s.currentSession];
+            sess.accumulated = (sess.accumulated || 0) + delta;
+          }
+        }
         s.startedAt = null; s.running = false;
         if (s.timer){ clearInterval(s.timer); s.timer = null; }
         startBtn.textContent = 'Reanudar';
@@ -215,17 +256,28 @@
         // stop alarm if playing
         try { if (alarmAudio) { alarmAudio.pause(); alarmAudio.currentTime = 0; } } catch(e){}
         if (s.timer){ clearInterval(s.timer); s.timer = null; }
-        // compute elapsed so far
-        if (s.startedAt) s.accumulated += Math.floor((Date.now() - s.startedAt) / 1000);
-        s.startedAt = null; s.running = false;
-        // charge full originally selected total
-        if (s.total && s.total > 0) {
-          s.amount = Math.round((s.total/60) * 1);
+        // compute elapsed so far and finalize current session
+        if (s.startedAt) {
+          const delta = Math.floor((Date.now() - s.startedAt) / 1000);
+          s.accumulated += delta;
+          if (s.currentSession !== null) {
+            const sess = s.sessions[s.currentSession];
+            sess.accumulated = (sess.accumulated || 0) + delta;
+            sess.end = Date.now();
+            sess.duration = sess.duration || (s.accumulated);
+            // charge full originally selected total as requested
+            sess.amount = sess.amount !== undefined && sess.amount !== null ? sess.amount : (s.plannedAmount || Math.round((s.total/60) * 1));
+            sess.settled = true;
+          }
         }
-        // hide change button and show finish-like UI (but no alarm)
+        s.startedAt = null; s.running = false;
+        // hide change and stop buttons
         if (changeBtn) changeBtn.style.display = 'none';
-        if (finishBtn) finishBtn.style.display = 'none';
-        startBtn.textContent = 'Iniciar'; startBtn.disabled = true;
+        if (stopBtn) stopBtn.style.display = 'none';
+        // reset current session pointer
+        s.currentSession = null;
+        // make Iniciar available again
+        startBtn.textContent = 'Iniciar'; startBtn.disabled = false;
         saveStateToStorage();
         updateUI();
         updatePanelTotal();
@@ -235,28 +287,59 @@
     // change carrito - transfer session to another station (by number)
     if (changeBtn){
       changeBtn.addEventListener('click', async () => {
+        // If this button is in 'Otra ronda' mode, start a new round flow
+        if (changeBtn.textContent && changeBtn.textContent.toLowerCase().includes('otra')){
+          // stop alarm and prepare for new round; do not settle previous session
+          try { if (alarmAudio) { alarmAudio.pause(); alarmAudio.currentTime = 0; } } catch(e){}
+          if (finishBtn) finishBtn.style.display = 'none';
+          changeBtn.textContent = 'Cambiar Carrito';
+          // allow starting a new session
+          startBtn.disabled = false; startBtn.textContent = 'Iniciar';
+          // reset currentSession so next start creates a new one
+          s.currentSession = null;
+          saveStateToStorage();
+          updateUI();
+          return;
+        }
+        // pause timer while entering destination
+        if (s.running && s.startedAt) {
+          const delta = Math.floor((Date.now() - s.startedAt) / 1000);
+          s.accumulated += delta;
+          if (s.currentSession !== null) {
+            const sess = s.sessions[s.currentSession];
+            sess.accumulated = (sess.accumulated || 0) + delta;
+          }
+          s.startedAt = null; s.running = false;
+          if (s.timer){ clearInterval(s.timer); s.timer = null; }
+          startBtn.textContent = 'Reanudar';
+        }
         // prompt for destination station number
         const dest = window.prompt('Ingrese número de estación destino:');
-        if (!dest) return;
+        if (!dest) { saveStateToStorage(); return; }
         const destNum = parseInt(dest, 10);
-        if (isNaN(destNum)) { showToast && showToast('Número inválido', 3000, 'warning'); return; }
+        if (isNaN(destNum)) { showToast && showToast('Número inválido', 3000, 'warning'); saveStateToStorage(); return; }
         // find target card by number
         const allCards = Array.from(document.querySelectorAll('.card'));
         const targetCard = allCards.find(c => {
           const h = c.querySelector('h3');
           return h && h.textContent && h.textContent.indexOf('#' + destNum) !== -1;
         });
-        if (!targetCard) { showToast && showToast('Estación destino no encontrada', 3000, 'warning'); return; }
+        if (!targetCard) { showToast && showToast('Estación destino no encontrada', 3000, 'warning'); saveStateToStorage(); return; }
         const sourceId = id;
         const targetId = targetCard.dataset.id;
-        if (targetId === sourceId) { showToast && showToast('Ya estás en esa estación', 3000, 'info'); return; }
+        if (targetId === sourceId) { showToast && showToast('Ya estás en esa estación', 3000, 'info'); saveStateToStorage(); return; }
         // if target has active session, confirm overwrite
         const targetState = state[targetId];
-        if (targetState && (targetState.running || targetState.accumulated > 0)){
-          if (!confirm('La estación destino ya tiene una sesión. Sobrescribirla?')) return;
+        if (targetState && (targetState.running || (Array.isArray(targetState.sessions) && targetState.sessions.length>0))) {
+          if (!confirm('La estación destino ya tiene una sesión. Sobrescribirla?')) { saveStateToStorage(); return; }
         }
-        // transfer session
-        state[targetId] = Object.assign({}, s);
+        // transfer session data: move sessions array and running state
+        state[targetId] = state[targetId] || { running:false, startedAt:null, accumulated:0, total:0, amount:0, timer:null, sessions:[], currentSession:null };
+        // move current sessions to target
+        state[targetId].sessions = (state[targetId].sessions || []).concat(s.sessions || []);
+        state[targetId].accumulated = s.accumulated;
+        state[targetId].total = s.total;
+        state[targetId].plannedAmount = s.plannedAmount;
         // clear source
         delete state[sourceId];
         saveStateToStorage();
@@ -272,7 +355,18 @@
         // keep timer at completed state but clear any running state
         if (s.timer){ clearInterval(s.timer); s.timer = null; }
         s.running = false; s.startedAt = null;
+        // mark any completed (ended) sessions as settled (final payment)
+        if (Array.isArray(s.sessions)){
+          s.sessions.forEach(sess => {
+            if (sess && sess.end && !sess.settled){
+              sess.settled = true;
+              sess.amount = sess.amount !== undefined && sess.amount !== null ? sess.amount : (sess.amount = (s.plannedAmount || Math.round((s.total/60) * 1)) );
+            }
+          });
+        }
         startBtn.disabled = false; finishBtn.style.display = 'none';
+        if (changeBtn) changeBtn.style.display = 'none';
+        s.currentSession = null;
         saveStateToStorage();
         updateUI();
         updatePanelTotal();
@@ -281,7 +375,12 @@
   }
 
   function updatePanelTotal(){
-    const total = Object.values(state).reduce((sum, s) => sum + (s.amount || 0), 0);
+    // Sum only settled (finalized/stopped) session amounts
+    const total = Object.values(state).reduce((sum, s) => {
+      if (!s || !Array.isArray(s.sessions)) return sum;
+      const settled = s.sessions.reduce((ss, sess) => ss + ((sess && sess.settled && sess.amount) ? Number(sess.amount) : 0), 0);
+      return sum + settled;
+    }, 0);
     const el = document.getElementById('panelTotal');
     if (el) el.textContent = `C$ ${total}`;
   }
