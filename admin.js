@@ -53,7 +53,9 @@
     if (!confirm('Eliminar esta estación? Esta acción no se puede deshacer.')) return;
     try {
       const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
-      const res = await fetch((base || '') + '/api/stations/' + id, { method: 'DELETE' });
+      const token = localStorage.getItem('carsplay_token');
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      const res = await fetch((base || '') + '/api/stations/' + id, { method: 'DELETE', headers });
       if (!res.ok) { const txt = await res.text(); alert('Error eliminando: ' + txt); return; }
       showToast('Estación eliminada', 3000, 'success');
       await loadStations();
@@ -77,8 +79,10 @@
       if (isNaN(newNumber)) { alert('Número inválido'); return; }
       try {
         const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+        const token = localStorage.getItem('carsplay_token');
+        const headers = Object.assign({ 'Content-Type': 'application/json' }, token ? { 'Authorization': 'Bearer ' + token } : {});
         const res = await fetch((base || '') + '/api/stations/' + station._id, {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ number: newNumber })
+          method: 'PUT', headers, body: JSON.stringify({ number: newNumber })
         });
         if (res.status === 409) { alert('Ese número ya está ocupado'); return; }
         if (!res.ok) { const txt = await res.text(); alert('Error: ' + txt); return; }
@@ -127,8 +131,10 @@
       form.append('number', number);
       form.append('image', blob, `carrito-${Date.now()}.jpg`);
       const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : 'https://carsplay.onrender.com';
+      const token = localStorage.getItem('carsplay_token');
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
       const res = await fetch((base || '') + '/api/stations', {
-        method: 'POST', body: form
+        method: 'POST', headers, body: form
       });
       if (!res.ok) { const txt = await res.text(); showToast('Error: ' + txt, 4000, 'error'); return; }
       // success
@@ -240,8 +246,10 @@
     if (!stationId) { alert('Selecciona una estación'); return; }
     try {
       const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+      const token = localStorage.getItem('carsplay_token');
+      const headers = Object.assign({ 'Content-Type': 'application/json' }, token ? { 'Authorization': 'Bearer ' + token } : {});
       const res = await fetch((base || '') + '/api/stations/' + stationId, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        method: 'PUT', headers,
         body: JSON.stringify({ price })
       });
       if (!res.ok) { alert('Error actualizando precio'); return; }
@@ -262,6 +270,7 @@
     });
     document.getElementById('sidebarLogout').addEventListener('click', () => {
       localStorage.removeItem(USER_KEY);
+      localStorage.removeItem('carsplay_token');
       window.location.href = (window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '') + '/admin_login.html';
     });
     const downloadBtn = document.getElementById('downloadReport');

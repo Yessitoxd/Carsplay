@@ -7,7 +7,11 @@
     e.preventDefault();
     const username = document.getElementById('a-username').value.trim();
     const password = document.getElementById('a-password').value;
-    const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+    // If `window.API_BASE` isn't set (e.g. opening this file directly with Live Server),
+    // fall back to the deployed API so requests don't go to the static server origin.
+    const base = window.API_BASE && String(window.API_BASE).trim()
+      ? String(window.API_BASE).replace(/\/$/, '')
+      : 'https://carsplay.onrender.com';
     try {
       const res = await fetch((base || '') + '/api/login', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -25,7 +29,9 @@
           alert('Acceso denegado: necesitas credenciales de administrador');
           return;
         }
+        // store user info and token for authenticated admin requests
         localStorage.setItem('carsplay_user', JSON.stringify({ username: data.username, role: data.role }));
+        if (data.token) localStorage.setItem('carsplay_token', data.token);
         window.location.href = (base || '') + '/admin.html';
         return;
       }

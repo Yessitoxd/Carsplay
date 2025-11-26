@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const { connect } = require('./db');
 const User = require('./models/user');
@@ -16,6 +17,30 @@ app.use(express.json());
 
 // configure multer to use memory storage — we'll push files into GridFS
 const upload = multer({ storage: multer.memoryStorage() });
+
+// JWT secret for signing tokens (set via env in production)
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+
+// Middleware: verify incoming Bearer token and attach payload to req.user
+function verifyToken(req, res, next) {
+  const auth = req.headers['authorization'] || req.headers['Authorization'];
+  if (!auth) return res.status(401).json({ ok: false, error: 'missing_token' });
+  const parts = String(auth).split(' ');
+  if (parts.length !== 2 || parts[0] !== 'Bearer') return res.status(401).json({ ok: false, error: 'invalid_token' });
+  const token = parts[1];
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.user = payload;
+    return next();
+  } catch (e) {
+    return res.status(401).json({ ok: false, error: 'invalid_token' });
+  }
+}
+
+function requireAdmin(req, res, next) {
+  if (!req.user || (req.user.role || '').toLowerCase() !== 'admin') return res.status(403).json({ ok: false, error: 'forbidden' });
+  return next();
+}
 
 // note: we previously served /uploads from disk; switching to GridFS will serve via `/api/uploads/:id`
 
@@ -44,7 +69,9 @@ app.post('/api/login', async (req, res) => {
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ ok: false, error: 'invalid_credentials' });
 
-    return res.json({ ok: true, username: user.username, role: user.role || 'employee' });
+      // create JWT token
+      const token = jwt.sign({ userId: user._id, username: user.username, role: user.role || 'employee' }, JWT_SECRET, { expiresIn: '6h' });
+      return res.json({ ok: true, username: user.username, role: user.role || 'employee', token });
   } catch (err) {
     console.error('Login error', err);
     return res.status(500).json({ ok: false, error: 'server_error' });
@@ -63,7 +90,7 @@ app.get('/api/stations', async (req, res) => {
 });
 
 // Create station with optional image upload (multipart/form-data)
-app.post('/api/stations', upload.single('image'), async (req, res) => {
+app.post('/api/stations', verifyToken, requireAdmin, upload.single('image'), async (req, res) => {
   // NOTE: no auth yet — restrict in future
   try {
     const name = req.body.name || 'Carrito';
@@ -104,7 +131,7 @@ app.post('/api/stations', upload.single('image'), async (req, res) => {
 });
 
 // Update station (number or replace image via multipart)
-app.put('/api/stations/:id', upload.single('image'), async (req, res) => {
+app.put('/api/stations/:id', verifyToken, requireAdmin, upload.single('image'), async (req, res) => {
   try {
     const id = req.params.id;
     const number = req.body.number ? Number(req.body.number) : undefined;
@@ -142,7 +169,7 @@ app.put('/api/stations/:id', upload.single('image'), async (req, res) => {
 });
 
 // Delete station and remove image from GridFS if present
-app.delete('/api/stations/:id', async (req, res) => {
+app.delete('/api/stations/:id', verifyToken, requireAdmin, async (req, res) => {
   try {
     const id = req.params.id;
     const station = await Station.findById(id).exec();
