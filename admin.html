@@ -39,15 +39,19 @@
 
         <div id="section-addCarritos" class="admin-section" style="display:none">
           <h2>Añadir Carritos</h2>
-          <form id="createStation">
-            <label for="s-name">Nombre</label>
-            <input id="s-name" name="name" required>
-            <label for="s-number">Número (opcional)</label>
-            <input id="s-number" name="number" type="number">
-            <label for="s-price">Precio</label>
-            <input id="s-price" name="price" type="number" value="0">
-            <button class="btn primary" type="submit">Crear estación</button>
-          </form>
+          <form id="createStation" enctype="multipart/form-data">
+              <!-- El nombre no lo elige el cliente; lo ponemos nosotros como 'Carrito' -->
+              <p>El nombre de la estación será: <strong>Carrito</strong></p>
+
+              <label for="s-number">Número (requerido)</label>
+              <input id="s-number" name="number" type="number" required>
+
+              <label for="s-image">Imagen (1:1, se recortará/ajustará automáticamente)</label>
+              <input id="s-image" name="image" type="file" accept="image/*" required>
+              <div id="imagePreview" aria-hidden="true" style="margin-top:8px"></div>
+
+              <button class="btn primary" type="submit">Crear estación</button>
+            </form>
           <hr>
           <h3>Estaciones existentes</h3>
           <div id="stationList"></div>
