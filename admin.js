@@ -28,11 +28,66 @@
       stations.forEach(s => {
         const div = document.createElement('div');
         div.className = 'station-row';
-        // display as Carrito #N for clarity
-        div.textContent = `${s.name || 'Carrito'} #${s.number || '-'} `;
+        // thumbnail
+        const img = document.createElement('img');
+        img.alt = s.name || 'Carrito';
+        if (s.image) img.src = s.image; else img.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"></svg>';
+        div.appendChild(img);
+        // title
+        const title = document.createElement('div'); title.style.flex = '1'; title.textContent = `${s.name || 'Carrito'} #${s.number || '-'}`;
+        div.appendChild(title);
+        // actions
+        const editBtn = document.createElement('button'); editBtn.className = 'btn secondary'; editBtn.textContent = 'Editar';
+        editBtn.addEventListener('click', () => openEditModal(s));
+        const delBtn = document.createElement('button'); delBtn.className = 'btn danger'; delBtn.textContent = 'Eliminar';
+        delBtn.addEventListener('click', () => deleteStation(s._id));
+        const actions = document.createElement('div'); actions.appendChild(editBtn); actions.appendChild(delBtn);
+        div.appendChild(actions);
         list.appendChild(div);
       });
     } catch (e) { console.error(e); }
+  }
+
+  // delete station
+  async function deleteStation(id){
+    if (!confirm('Eliminar esta estación? Esta acción no se puede deshacer.')) return;
+    try {
+      const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+      const res = await fetch((base || '') + '/api/stations/' + id, { method: 'DELETE' });
+      if (!res.ok) { const txt = await res.text(); alert('Error eliminando: ' + txt); return; }
+      showToast('Estación eliminada', 3000, 'success');
+      await loadStations();
+    } catch (e) { console.error(e); alert('Error eliminando estación'); }
+  }
+
+  // Edit modal handling
+  function openEditModal(station){
+    const modal = document.getElementById('editModal');
+    const wrap = document.getElementById('editImageWrap');
+    wrap.innerHTML = '';
+    const img = document.createElement('img'); img.src = station.image || ''; img.style.width = '100%'; img.style.borderRadius = '6px';
+    wrap.appendChild(img);
+    document.getElementById('editNumber').value = station.number || '';
+    modal.style.display = '';
+    // attach save handler
+    const form = document.getElementById('editForm');
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const newNumber = parseInt(document.getElementById('editNumber').value,10);
+      if (isNaN(newNumber)) { alert('Número inválido'); return; }
+      try {
+        const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+        const res = await fetch((base || '') + '/api/stations/' + station._id, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ number: newNumber })
+        });
+        if (res.status === 409) { alert('Ese número ya está ocupado'); return; }
+        if (!res.ok) { const txt = await res.text(); alert('Error: ' + txt); return; }
+        showToast('Estación actualizada', 3000, 'success');
+        modal.style.display = 'none';
+        await loadStations();
+      } catch (err) { console.error(err); alert('Error actualizando'); }
+    };
+    document.getElementById('cancelEdit').onclick = () => { modal.style.display = 'none'; };
   }
 
   async function createStation(ev){
