@@ -90,11 +90,79 @@ app.post('/api/stations', upload.single('image'), async (req, res) => {
       imageUrl = `/api/uploads/${fileId}`;
     }
 
+    // ensure number uniqueness
+    const existing = await Station.findOne({ number }).exec();
+    if (existing) return res.status(409).json({ ok: false, error: 'number_taken' });
+
     const station = new Station({ name, number, image: imageUrl });
     await station.save();
     return res.status(201).json(station);
   } catch (err) {
     console.error('Stations create error', err);
+    return res.status(500).json({ ok: false, error: 'server_error' });
+  }
+});
+
+// Update station (number or replace image via multipart)
+app.put('/api/stations/:id', upload.single('image'), async (req, res) => {
+  try {
+    const id = req.params.id;
+    const number = req.body.number ? Number(req.body.number) : undefined;
+    // if number provided, ensure uniqueness among others
+    if (number !== undefined) {
+      const clash = await Station.findOne({ number, _id: { $ne: id } }).exec();
+      if (clash) return res.status(409).json({ ok: false, error: 'number_taken' });
+    }
+
+    const update = {};
+    if (number !== undefined) update.number = number;
+
+    // handle image replacement: if file buffer present, store in GridFS and set image URL
+    if (req.file && req.file.buffer) {
+      if (!mongoose.connection || !mongoose.connection.db) return res.status(500).json({ ok: false, error: 'db_not_ready' });
+      const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
+      const filename = req.file.originalname || (`upload-${Date.now()}.jpg`);
+      const uploadStream = bucket.openUploadStream(filename, { contentType: req.file.mimetype });
+      await new Promise((resolve, reject) => {
+        uploadStream.on('error', (err) => reject(err));
+        uploadStream.on('finish', () => resolve());
+        uploadStream.end(req.file.buffer);
+      });
+      const fileId = uploadStream.id;
+      update.image = `/api/uploads/${fileId}`;
+    }
+
+    const updated = await Station.findByIdAndUpdate(id, update, { new: true }).exec();
+    if (!updated) return res.status(404).json({ ok: false, error: 'not_found' });
+    return res.json(updated);
+  } catch (err) {
+    console.error('Station update error', err);
+    return res.status(500).json({ ok: false, error: 'server_error' });
+  }
+});
+
+// Delete station and remove image from GridFS if present
+app.delete('/api/stations/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const station = await Station.findById(id).exec();
+    if (!station) return res.status(404).json({ ok: false, error: 'not_found' });
+    // if image stored as /api/uploads/<fileId>, extract and delete from GridFS
+    if (station.image && station.image.startsWith('/api/uploads/')) {
+      const fileId = station.image.split('/').pop();
+      try {
+        if (mongoose.connection && mongoose.connection.db) {
+          const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
+          await bucket.delete(new mongoose.Types.ObjectId(fileId));
+        }
+      } catch (e) {
+        console.error('GridFS delete warning', e.message || e);
+      }
+    }
+    await Station.deleteOne({ _id: id }).exec();
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Station delete error', err);
     return res.status(500).json({ ok: false, error: 'server_error' });
   }
 });
