@@ -6,6 +6,14 @@
     return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
   };
 
+  // Global alarm audio (place Alarm.wav at project root / served statically)
+  const ALARM_SRC = (window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '') + '/Alarm.wav';
+  let alarmAudio = null;
+  try {
+    alarmAudio = new Audio(ALARM_SRC);
+    alarmAudio.loop = true;
+  } catch (e) { alarmAudio = null; }
+
   // Persistent storage keys
   const USER_KEY = 'carsplay_user';
   const STATE_KEY = 'carsplay_timers_v1';
@@ -64,7 +72,7 @@
       <div class="times"><div class="elapsed">00:00:00</div><div class="remaining">00:00:00</div></div>
       <div class="bar"><div class="bar-fill" style="width:0%"></div></div>
       <div class="controls">${selectHtml}<div class="price">C$ <span class="amount">${station.price || 0}</span></div></div>
-      <div class="buttons"><button class="start">Iniciar</button><button class="reset">Restablecer</button></div>
+      <div class="buttons"><button class="start">Iniciar</button><button class="reset">Restablecer</button><button class="finish" style="display:none">Finalizar</button></div>
     `;
 
     return div;
@@ -85,6 +93,7 @@
 
     const startBtn = card.querySelector('.start');
     const resetBtn = card.querySelector('.reset');
+    const finishBtn = card.querySelector('.finish');
     const durationSel = card.querySelector('.duration');
     const elapsedEl = card.querySelector('.elapsed');
     const remainingEl = card.querySelector('.remaining');
@@ -134,6 +143,13 @@
       s.running = false; s.startedAt = null; s.accumulated = s.total;
       if (s.timer){ clearInterval(s.timer); s.timer = null; }
       startBtn.textContent = 'Iniciar';
+      // show finish button and start alarm loop
+      try {
+        if (alarmAudio) { alarmAudio.currentTime = 0; alarmAudio.play().catch(()=>{}); }
+      } catch(e){}
+      if (finishBtn) { finishBtn.style.display = ''; }
+      // optionally disable start until finalized
+      startBtn.disabled = true;
       saveStateToStorage();
       updateUI();
       updatePanelTotal();
@@ -158,6 +174,10 @@
     // apply duration default before rendering
     applySelectedDuration();
     updateUI();
+    // if already completed (from persisted state), trigger completion UI/alarm
+    if (s.total > 0 && getElapsed() >= s.total) {
+      finishTimer();
+    }
 
     startBtn.addEventListener('click', () => {
       if (!s.running){
@@ -179,15 +199,31 @@
       }
       updatePanelTotal();
     });
-
     resetBtn.addEventListener('click', () => {
+      // stop alarm if playing
+      try { if (alarmAudio) { alarmAudio.pause(); alarmAudio.currentTime = 0; } } catch(e){}
       if (s.timer){ clearInterval(s.timer); s.timer = null; }
       s.running = false; s.startedAt = null; s.accumulated = 0; s.total = 0; s.amount = 0;
-      startBtn.textContent = 'Iniciar';
+      if (finishBtn) finishBtn.style.display = 'none';
+      startBtn.textContent = 'Iniciar'; startBtn.disabled = false;
       saveStateToStorage();
       updateUI();
       updatePanelTotal();
     });
+
+    if (finishBtn){
+      finishBtn.addEventListener('click', () => {
+        // stop alarm loop and mark as finalized
+        try { if (alarmAudio) { alarmAudio.pause(); alarmAudio.currentTime = 0; } } catch(e){}
+        // keep timer at completed state but clear any running state
+        if (s.timer){ clearInterval(s.timer); s.timer = null; }
+        s.running = false; s.startedAt = null;
+        startBtn.disabled = false; finishBtn.style.display = 'none';
+        saveStateToStorage();
+        updateUI();
+        updatePanelTotal();
+      });
+    }
   }
 
   function updatePanelTotal(){
