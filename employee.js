@@ -37,9 +37,13 @@
     const div = document.createElement('div');
     div.className = 'card';
     div.dataset.id = id;
+    // Render thumbnail image if available, otherwise show placeholder text
+    const thumbHtml = station.image
+      ? `<div class="img"><img src="${station.image}" alt="${station.name || 'Carrito'}" style="width:100%;height:100%;object-fit:cover;border-radius:6px"/></div>`
+      : `<div class="img">Imagen</div>`;
 
     div.innerHTML = `
-      <div class="card-head"><div class="img">Imagen</div><h3>${station.name || 'Carrito #' + (idx+1)}</h3></div>
+      <div class="card-head">${thumbHtml}<h3>${station.name || 'Carrito'} #${station.number || (idx+1)}</h3></div>
       <div class="times"><div class="elapsed">00:00:00</div><div class="remaining">00:00:00</div></div>
       <div class="bar"><div class="bar-fill" style="width:0%"></div></div>
       <div class="controls"><select class="duration">
@@ -207,9 +211,24 @@
       panel.setAttribute('aria-hidden', open ? 'false' : 'true');
     }
 
-    toggle.addEventListener('click', () => {
+    // Toggle via the button (or click on the name which is inside the button)
+    toggle.addEventListener('click', (ev) => {
+      ev.stopPropagation();
       const isOpen = document.body.classList.contains('panel-open');
       setOpen(!isOpen);
+    });
+
+    // Close panel when clicking outside of it for convenience
+    document.addEventListener('click', (ev) => {
+      const target = ev.target;
+      if (!panel.contains(target) && !toggle.contains(target)) {
+        setOpen(false);
+      }
+    });
+
+    // Allow Escape key to close the panel
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') setOpen(false);
     });
 
     logoutBtn.addEventListener('click', () => {
