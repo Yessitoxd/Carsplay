@@ -239,6 +239,78 @@
     } catch(e){ console.error(e); }
   }
 
+  // --- Time rate management ---
+  async function loadTimeRates(){
+    try {
+      const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+      const res = await fetch((base || '') + '/api/time/rates');
+      const list = document.getElementById('timeRateList');
+      list.innerHTML = '';
+      if (!res.ok) { list.textContent = 'No se pudieron cargar tarifas'; return; }
+      const rates = await res.json();
+      if (!Array.isArray(rates) || rates.length === 0){ list.textContent = 'No hay tarifas aún'; return; }
+      rates.forEach(r => {
+        const row = document.createElement('div'); row.className = 'station-row';
+        const title = document.createElement('div'); title.style.flex = '1'; title.textContent = `${r.minutes} min = C$ ${r.amount}`;
+        const editBtn = document.createElement('button'); editBtn.className = 'btn secondary'; editBtn.textContent = 'Editar';
+        editBtn.addEventListener('click', () => editTimeRate(r));
+        const delBtn = document.createElement('button'); delBtn.className = 'btn danger'; delBtn.textContent = 'Eliminar';
+        delBtn.addEventListener('click', () => deleteTimeRate(r._id));
+        const actions = document.createElement('div'); actions.appendChild(editBtn); actions.appendChild(delBtn);
+        row.appendChild(title); row.appendChild(actions);
+        list.appendChild(row);
+      });
+    } catch (e){ console.error(e); }
+  }
+
+  async function createTimeRate(ev){
+    ev.preventDefault();
+    const minsEl = document.getElementById('tr-minutes');
+    const amtEl = document.getElementById('tr-amount');
+    const minutes = parseInt(minsEl.value,10);
+    const amount = parseFloat(amtEl.value) || 0;
+    if (!minutes || minutes <= 0) { showToast('Minutos inválidos', 3000, 'warning'); return; }
+    try {
+      const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+      const token = localStorage.getItem('carsplay_token');
+      const headers = Object.assign({ 'Content-Type': 'application/json' }, token ? { 'Authorization': 'Bearer ' + token } : {});
+      const res = await fetch((base || '') + '/api/time/rates', { method: 'POST', headers, body: JSON.stringify({ minutes, amount }) });
+      if (!res.ok) { const txt = await res.text(); showToast('Error: ' + txt, 4000, 'error'); return; }
+      minsEl.value = ''; amtEl.value = '';
+      showToast('Tarifa añadida', 3000, 'success');
+      await loadTimeRates();
+    } catch (e){ console.error(e); showToast('Error creando tarifa', 3000, 'error'); }
+  }
+
+  async function editTimeRate(rate){
+    const newM = parseInt(prompt('Minutos:', String(rate.minutes)),10);
+    if (isNaN(newM) || newM <= 0) return;
+    const newA = parseFloat(prompt('Monto C$:', String(rate.amount)));
+    if (isNaN(newA) || newA < 0) return;
+    try {
+      const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+      const token = localStorage.getItem('carsplay_token');
+      const headers = Object.assign({ 'Content-Type': 'application/json' }, token ? { 'Authorization': 'Bearer ' + token } : {});
+      const res = await fetch((base || '') + '/api/time/rates/' + rate._id, { method: 'PUT', headers, body: JSON.stringify({ minutes: newM, amount: newA }) });
+      if (!res.ok) { const txt = await res.text(); showToast('Error: ' + txt, 4000, 'error'); return; }
+      showToast('Tarifa actualizada', 3000, 'success');
+      await loadTimeRates();
+    } catch (e){ console.error(e); showToast('Error actualizando tarifa', 3000, 'error'); }
+  }
+
+  async function deleteTimeRate(id){
+    if (!confirm('Eliminar esta tarifa?')) return;
+    try {
+      const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+      const token = localStorage.getItem('carsplay_token');
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      const res = await fetch((base || '') + '/api/time/rates/' + id, { method: 'DELETE', headers });
+      if (!res.ok) { const txt = await res.text(); showToast('Error: ' + txt, 4000, 'error'); return; }
+      showToast('Tarifa eliminada', 3000, 'success');
+      await loadTimeRates();
+    } catch (e){ console.error(e); showToast('Error eliminando tarifa', 3000, 'error'); }
+  }
+
   async function updatePrice(ev){
     ev.preventDefault();
     const stationId = document.getElementById('priceStation').value;
@@ -265,7 +337,7 @@
         const sec = btn.dataset.section;
         showSection(sec);
         if (sec === 'addCarritos') loadStations();
-        if (sec === 'addPrices') populatePriceEditor();
+        if (sec === 'addPrices') { populatePriceEditor(); loadTimeRates(); }
       });
     });
     document.getElementById('sidebarLogout').addEventListener('click', () => {
@@ -277,6 +349,8 @@
     if (downloadBtn) downloadBtn.addEventListener('click', downloadReport);
     const updateBtn = document.getElementById('updatePrice');
     if (updateBtn) updateBtn.addEventListener('click', updatePrice);
+    const createTR = document.getElementById('createTimeRate');
+    if (createTR) createTR.addEventListener('submit', createTimeRate);
     // image input and dropzone behavior
     const imgInput = document.getElementById('s-image');
     const dropzone = document.getElementById('imageDropzone');

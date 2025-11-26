@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const { connect } = require('./db');
 const User = require('./models/user');
 const Station = require('./models/station');
+const TimeRate = require('./models/timeRate');
 
 const app = express();
 const fs = require('fs');
@@ -85,6 +86,64 @@ app.get('/api/stations', async (req, res) => {
     return res.json(stations);
   } catch (err) {
     console.error('Stations fetch error', err);
+    return res.status(500).json({ ok: false, error: 'server_error' });
+  }
+});
+
+// Time rate endpoints
+// Public GET allows employee UI to fetch available time tiers
+app.get('/api/time/rates', async (req, res) => {
+  try {
+    const rates = await TimeRate.find({}).sort({ minutes: 1 }).exec();
+    return res.json(rates);
+  } catch (err) {
+    console.error('Time rates fetch error', err);
+    return res.status(500).json({ ok: false, error: 'server_error' });
+  }
+});
+
+// Create a new time->amount rate (admin only)
+app.post('/api/time/rates', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const minutes = Number(req.body.minutes);
+    const amount = Number(req.body.amount);
+    if (!minutes || minutes <= 0) return res.status(400).json({ ok: false, error: 'invalid_minutes' });
+    if (isNaN(amount) || amount < 0) return res.status(400).json({ ok: false, error: 'invalid_amount' });
+    const r = new TimeRate({ minutes, amount });
+    await r.save();
+    return res.status(201).json(r);
+  } catch (err) {
+    console.error('Create time rate error', err);
+    return res.status(500).json({ ok: false, error: 'server_error' });
+  }
+});
+
+// Update rate (admin only)
+app.put('/api/time/rates/:id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const minutes = req.body.minutes !== undefined ? Number(req.body.minutes) : undefined;
+    const amount = req.body.amount !== undefined ? Number(req.body.amount) : undefined;
+    const update = {};
+    if (minutes !== undefined) update.minutes = minutes;
+    if (amount !== undefined) update.amount = amount;
+    const updated = await TimeRate.findByIdAndUpdate(id, update, { new: true }).exec();
+    if (!updated) return res.status(404).json({ ok: false, error: 'not_found' });
+    return res.json(updated);
+  } catch (err) {
+    console.error('Update time rate error', err);
+    return res.status(500).json({ ok: false, error: 'server_error' });
+  }
+});
+
+// Delete rate (admin only)
+app.delete('/api/time/rates/:id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const id = req.params.id;
+    await TimeRate.deleteOne({ _id: id }).exec();
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Delete time rate error', err);
     return res.status(500).json({ ok: false, error: 'server_error' });
   }
 });

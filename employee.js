@@ -10,6 +10,9 @@
   const USER_KEY = 'carsplay_user';
   const STATE_KEY = 'carsplay_timers_v1';
 
+  // cached time rates from server
+  let TIME_RATES = [];
+
   // Track runtime state per card id
   const state = {};
 
@@ -42,16 +45,25 @@
       ? `<div class="img"><img src="${station.image}" alt="${station.name || 'Carrito'}" style="width:100%;height:100%;object-fit:cover;border-radius:6px"/></div>`
       : `<div class="img">Imagen</div>`;
 
-    div.innerHTML = `
-      <div class="card-head">${thumbHtml}<h3>${station.name || 'Carrito'} #${station.number || (idx+1)}</h3></div>
-      <div class="times"><div class="elapsed">00:00:00</div><div class="remaining">00:00:00</div></div>
-      <div class="bar"><div class="bar-fill" style="width:0%"></div></div>
-      <div class="controls"><select class="duration">
+    // build duration select based on TIME_RATES (fallback to static options)
+    let selectHtml = '';
+    if (Array.isArray(TIME_RATES) && TIME_RATES.length > 0) {
+      selectHtml = '<select class="duration">' + TIME_RATES.map(tr => `<option value="${tr.minutes}" data-amount="${tr.amount}">${tr.minutes} min</option>`).join('') + '</select>';
+    } else {
+      selectHtml = `
+        <select class="duration">
           <option value="15">15 min</option>
           <option value="30" selected>30 min</option>
           <option value="45">45 min</option>
           <option value="60">60 min</option>
-        </select><div class="price">C$ <span class="amount">${station.price || 0}</span></div></div>
+        </select>`;
+    }
+
+    div.innerHTML = `
+      <div class="card-head">${thumbHtml}<h3>${station.name || 'Carrito'} #${station.number || (idx+1)}</h3></div>
+      <div class="times"><div class="elapsed">00:00:00</div><div class="remaining">00:00:00</div></div>
+      <div class="bar"><div class="bar-fill" style="width:0%"></div></div>
+      <div class="controls">${selectHtml}<div class="price">C$ <span class="amount">${station.price || 0}</span></div></div>
       <div class="buttons"><button class="start">Iniciar</button><button class="reset">Restablecer</button></div>
     `;
 
@@ -96,6 +108,26 @@
       amountEl.textContent = s.amount || 0;
     }
 
+    // initialize total/amount based on selected duration option
+    function applySelectedDuration(){
+      if (!durationSel) return;
+      const mins = parseInt(durationSel.value,10) || 0;
+      const opt = durationSel.selectedOptions && durationSel.selectedOptions[0];
+      const amt = opt && opt.dataset && opt.dataset.amount !== undefined ? parseFloat(opt.dataset.amount) : null;
+      s.total = mins * 60;
+      if (amt !== null) s.amount = amt; // use rate amount when provided
+    }
+
+    // when user changes duration, update totals
+    if (durationSel){
+      durationSel.addEventListener('change', () => {
+        applySelectedDuration();
+        saveStateToStorage();
+        updateUI();
+        updatePanelTotal();
+      });
+    }
+
     function finishTimer(){
       // compute final amount (simple formula: 1 per hour)
       s.amount = Math.round((s.total/60) * 1);
@@ -123,6 +155,8 @@
     }
 
     // if timer already completed, ensure UI shows amount
+    // apply duration default before rendering
+    applySelectedDuration();
     updateUI();
 
     startBtn.addEventListener('click', () => {
@@ -166,6 +200,11 @@
     let stations = null;
     try {
       const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+      // fetch time rates first (optional)
+      try {
+        const tr = await fetch((base || '') + '/api/time/rates');
+        if (tr.ok) TIME_RATES = await tr.json();
+      } catch(e) { TIME_RATES = []; }
       const res = await fetch((base || '') + '/api/stations');
       if (res.ok){ stations = await res.json(); }
     } catch (e){ /* ignore */ }
