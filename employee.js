@@ -21,6 +21,9 @@
   // cached time rates from server
   let TIME_RATES = [];
 
+  // Map station number -> card id (populated on load)
+  const STATION_BY_NUMBER = {};
+
   // Track runtime state per card id
   const state = {};
 
@@ -72,7 +75,7 @@
       <div class="times"><div class="elapsed">00:00:00</div><div class="remaining">00:00:00</div></div>
       <div class="bar"><div class="bar-fill" style="width:0%"></div></div>
       <div class="controls">${selectHtml}<div class="price">C$ <span class="amount">${station.price || 0}</span></div></div>
-      <div class="buttons"><button class="start">Iniciar</button><button class="reset">Restablecer</button><button class="finish" style="display:none">Finalizar</button></div>
+      <div class="buttons"><button class="start">Iniciar</button><button class="pause-change" style="display:none">Detener</button><button class="change" style="display:none">Cambiar Carrito</button><button class="finish" style="display:none">Finalizar</button></div>
     `;
 
     return div;
@@ -92,7 +95,8 @@
     }
 
     const startBtn = card.querySelector('.start');
-    const resetBtn = card.querySelector('.reset');
+    const stopBtn = card.querySelector('.pause-change');
+    const changeBtn = card.querySelector('.change');
     const finishBtn = card.querySelector('.finish');
     const durationSel = card.querySelector('.duration');
     const elapsedEl = card.querySelector('.elapsed');
@@ -148,7 +152,7 @@
         if (alarmAudio) { alarmAudio.currentTime = 0; alarmAudio.play().catch(()=>{}); }
       } catch(e){}
       if (finishBtn) { finishBtn.style.display = ''; }
-      // optionally disable start until finalized
+      // disable start until finalized
       startBtn.disabled = true;
       saveStateToStorage();
       updateUI();
@@ -188,6 +192,9 @@
         s.running = true;
         if (!s.timer) s.timer = setInterval(tick, 1000);
         startBtn.textContent = 'Pausar';
+        // show stop/change buttons while running
+        if (stopBtn) stopBtn.style.display = '';
+        if (changeBtn) changeBtn.style.display = '';
         saveStateToStorage();
       } else {
         // pause
@@ -195,21 +202,68 @@
         s.startedAt = null; s.running = false;
         if (s.timer){ clearInterval(s.timer); s.timer = null; }
         startBtn.textContent = 'Reanudar';
+        // while paused, keep stop/change visible
+        if (stopBtn) stopBtn.style.display = '';
+        if (changeBtn) changeBtn.style.display = '';
         saveStateToStorage();
       }
       updatePanelTotal();
     });
-    resetBtn.addEventListener('click', () => {
-      // stop alarm if playing
-      try { if (alarmAudio) { alarmAudio.pause(); alarmAudio.currentTime = 0; } } catch(e){}
-      if (s.timer){ clearInterval(s.timer); s.timer = null; }
-      s.running = false; s.startedAt = null; s.accumulated = 0; s.total = 0; s.amount = 0;
-      if (finishBtn) finishBtn.style.display = 'none';
-      startBtn.textContent = 'Iniciar'; startBtn.disabled = false;
-      saveStateToStorage();
-      updateUI();
-      updatePanelTotal();
-    });
+    // stop (detener) - stop early but charge full amount
+    if (stopBtn){
+      stopBtn.addEventListener('click', () => {
+        // stop alarm if playing
+        try { if (alarmAudio) { alarmAudio.pause(); alarmAudio.currentTime = 0; } } catch(e){}
+        if (s.timer){ clearInterval(s.timer); s.timer = null; }
+        // compute elapsed so far
+        if (s.startedAt) s.accumulated += Math.floor((Date.now() - s.startedAt) / 1000);
+        s.startedAt = null; s.running = false;
+        // charge full originally selected total
+        if (s.total && s.total > 0) {
+          s.amount = Math.round((s.total/60) * 1);
+        }
+        // hide change button and show finish-like UI (but no alarm)
+        if (changeBtn) changeBtn.style.display = 'none';
+        if (finishBtn) finishBtn.style.display = 'none';
+        startBtn.textContent = 'Iniciar'; startBtn.disabled = true;
+        saveStateToStorage();
+        updateUI();
+        updatePanelTotal();
+      });
+    }
+
+    // change carrito - transfer session to another station (by number)
+    if (changeBtn){
+      changeBtn.addEventListener('click', async () => {
+        // prompt for destination station number
+        const dest = window.prompt('Ingrese número de estación destino:');
+        if (!dest) return;
+        const destNum = parseInt(dest, 10);
+        if (isNaN(destNum)) { showToast && showToast('Número inválido', 3000, 'warning'); return; }
+        // find target card by number
+        const allCards = Array.from(document.querySelectorAll('.card'));
+        const targetCard = allCards.find(c => {
+          const h = c.querySelector('h3');
+          return h && h.textContent && h.textContent.indexOf('#' + destNum) !== -1;
+        });
+        if (!targetCard) { showToast && showToast('Estación destino no encontrada', 3000, 'warning'); return; }
+        const sourceId = id;
+        const targetId = targetCard.dataset.id;
+        if (targetId === sourceId) { showToast && showToast('Ya estás en esa estación', 3000, 'info'); return; }
+        // if target has active session, confirm overwrite
+        const targetState = state[targetId];
+        if (targetState && (targetState.running || targetState.accumulated > 0)){
+          if (!confirm('La estación destino ya tiene una sesión. Sobrescribirla?')) return;
+        }
+        // transfer session
+        state[targetId] = Object.assign({}, s);
+        // clear source
+        delete state[sourceId];
+        saveStateToStorage();
+        // reload stations UI to reflect changes
+        await loadStations();
+      });
+    }
 
     if (finishBtn){
       finishBtn.addEventListener('click', () => {
