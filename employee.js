@@ -6,13 +6,38 @@
     return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
   };
 
-  // Global alarm audio (place Alarm.wav at project root / served statically)
-  const ALARM_SRC = (window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '') + '/Alarm.wav';
+  // Global alarm audio (try several candidate paths; show friendly notice if missing)
+  const ALARM_CANDIDATES = [];
+  if (window.API_BASE) ALARM_CANDIDATES.push(window.API_BASE.replace(/\/$/, '') + '/Alarm.wav');
+  ALARM_CANDIDATES.push('/Alarm.wav');
+  ALARM_CANDIDATES.push('./Alarm.wav');
+  ALARM_CANDIDATES.push('Alarm.wav');
   let alarmAudio = null;
-  try {
-    alarmAudio = new Audio(ALARM_SRC);
-    alarmAudio.loop = true;
-  } catch (e) { alarmAudio = null; }
+  (function probeAlarm(){
+    // try candidates sequentially; assign alarmAudio when one resolves
+    const tryNext = (i) => {
+      if (i >= ALARM_CANDIDATES.length) {
+        console.warn('Alarm.wav not found at any candidate path');
+        showToast && showToast('Alarma no encontrada (Alarm.wav)', 4000, 'warning');
+        alarmAudio = null;
+        return;
+      }
+      const url = ALARM_CANDIDATES[i];
+      fetch(url, { method: 'GET' }).then(res => {
+        if (res.ok) {
+          try {
+            alarmAudio = new Audio(url);
+            alarmAudio.loop = true;
+            alarmAudio.load && alarmAudio.load();
+            console.info('Alarm.wav loaded from', url);
+          } catch (e) { alarmAudio = null; }
+        } else {
+          tryNext(i+1);
+        }
+      }).catch(() => { tryNext(i+1); });
+    };
+    tryNext(0);
+  })();
 
   // Persistent storage keys
   const USER_KEY = 'carsplay_user';
@@ -80,7 +105,7 @@
 
     div.innerHTML = `
       <div class="card-head">${thumbHtml}<h3>${station.name || 'Carrito'} #${station.number || (idx+1)}</h3></div>
-      <div class="times"><div class="elapsed">00:00:00</div><div class="remaining">00:00:00</div></div>
+      <div class="times"><div class="elapsed">00:00:00</div><div class="total">00:00:00</div></div>
       <div class="bar"><div class="bar-fill" style="width:0%"></div></div>
       <div class="controls">${selectHtml}<div class="price">C$ <span class="amount">${station.price || 0}</span></div></div>
       <div class="buttons"><button class="start">Iniciar</button><button class="pause-change" style="display:none">Detener</button><button class="change" style="display:none">Cambiar Carrito</button><button class="finish" style="display:none">Finalizar</button></div>
@@ -94,38 +119,57 @@
     // initialize state for this card
     if (!state[id]) state[id] = { running: false, startedAt: null, accumulated: 0, total: 0, amount: 0, timer: null, sessions: [], currentSession: null };
     const s = state[id];
+    // element references inside this card
+    const elapsedEl = card.querySelector('.elapsed');
+    const totalEl = card.querySelector('.total');
+    const fill = card.querySelector('.bar-fill');
+    const durationSel = card.querySelector('.duration');
+    const amountEl = card.querySelector('.amount');
+    const startBtn = card.querySelector('.start');
+    const stopBtn = card.querySelector('.pause-change');
+    const changeBtn = card.querySelector('.change');
+    const finishBtn = card.querySelector('.finish');
+
+    // helper to compute elapsed seconds
+    function getElapsed(){
+      const base = s.accumulated || 0;
+      if (s.running && s.startedAt){
+        const delta = Math.floor((Date.now() - s.startedAt) / 1000);
+        return base + delta;
+      }
+      return base;
+    }
+
+    // restore persisted state if present
     if (persisted){
       s.running = !!persisted.running;
       s.startedAt = persisted.startedAt || null;
       s.accumulated = persisted.accumulated || 0;
       s.total = persisted.total || 0;
       s.plannedAmount = persisted.plannedAmount || 0;
-      s.sessions = Array.isArray(persisted.sessions) ? persisted.sessions : [];
+      s.sessions = persisted.sessions || [];
       s.currentSession = persisted.currentSession !== undefined ? persisted.currentSession : null;
+      s.selectedMinutes = persisted.selectedMinutes || s.selectedMinutes || null;
+      // if there is no active or unfinished session, clear elapsed/total so the card starts at 0
+      const hasUnsettled = Array.isArray(s.sessions) && s.sessions.some(sess => sess && !sess.settled);
+      const hasActive = s.running || (s.currentSession !== null) || hasUnsettled;
+      if (!hasActive){
+        s.accumulated = 0;
+        s.total = 0;
+        s.currentSession = null;
+      }
     }
 
-    const startBtn = card.querySelector('.start');
-    const stopBtn = card.querySelector('.pause-change');
-    const changeBtn = card.querySelector('.change');
-    const finishBtn = card.querySelector('.finish');
-    const durationSel = card.querySelector('.duration');
-    const elapsedEl = card.querySelector('.elapsed');
-    const remainingEl = card.querySelector('.remaining');
-    const fill = card.querySelector('.bar-fill');
-    const amountEl = card.querySelector('.amount');
-
-    function getElapsed(){
-      if (s.running && s.startedAt) {
-        return s.accumulated + Math.floor((Date.now() - s.startedAt) / 1000);
-      }
-      return s.accumulated;
+    // set duration select from persisted selectedMinutes (visual only)
+    if (durationSel && s.selectedMinutes){
+      try { durationSel.value = String(s.selectedMinutes); } catch(e){}
     }
 
     function updateUI(){
       const elapsed = getElapsed();
       elapsedEl.textContent = fmt(Math.max(0, elapsed));
-      const remaining = Math.max(0, s.total - elapsed);
-      remainingEl.textContent = fmt(remaining);
+      // show fixed total duration on the right (doesn't change while running)
+      totalEl.textContent = fmt(s.total || 0);
       const pct = s.total > 0 ? Math.min(100, Math.round((elapsed / s.total) * 100)) : 0;
       fill.style.width = pct + '%';
       // show planned/current session amount (not included in panel total until settled)
@@ -144,7 +188,8 @@
       const mins = parseInt(durationSel.value,10) || 0;
       const opt = durationSel.selectedOptions && durationSel.selectedOptions[0];
       const amt = opt && opt.dataset && opt.dataset.amount !== undefined ? parseFloat(opt.dataset.amount) : null;
-      s.total = mins * 60;
+      // DO NOT overwrite s.total here. Keep selectedMinutes as a template
+      s.selectedMinutes = mins;
       // planned amount for display, but not settled until session finalizes
       if (amt !== null) s.plannedAmount = amt;
       else s.plannedAmount = 0;
@@ -174,7 +219,20 @@
       if (s.timer){ clearInterval(s.timer); s.timer = null; }
       startBtn.textContent = 'Iniciar';
       // show finish and another-round buttons and start alarm loop
-      try { if (alarmAudio) { alarmAudio.currentTime = 0; alarmAudio.play().catch(()=>{}); } } catch(e){}
+      try {
+        if (alarmAudio) {
+          alarmAudio.currentTime = 0;
+          alarmAudio.play().catch(err => {
+            console.warn('Alarm playback blocked, will prompt user interaction', err);
+            showToast && showToast('Toca la pantalla para activar el sonido', 4000, 'info');
+            const onClickEnableSound = () => {
+              try { alarmAudio.play().catch(()=>{}); } catch(e){}
+              document.removeEventListener('click', onClickEnableSound);
+            };
+            document.addEventListener('click', onClickEnableSound);
+          });
+        }
+      } catch(e){}
       if (finishBtn) { finishBtn.style.display = ''; }
       if (changeBtn) { changeBtn.style.display = ''; changeBtn.textContent = 'Otra ronda'; }
       // disable start until finalized or stopped
@@ -182,12 +240,14 @@
       saveStateToStorage();
       updateUI();
       updatePanelTotal();
+      refreshControls();
     }
 
     function tick(){
       const elapsed = getElapsed();
       if (s.total > 0 && elapsed >= s.total){ finishTimer(); return; }
       updateUI();
+      refreshControls();
     }
 
     // restore running timer
@@ -206,14 +266,36 @@
     applySelectedDuration();
     updateUI();
     // if already completed (from persisted state), trigger completion UI/alarm
-    if (s.total > 0 && getElapsed() >= s.total) {
+      if (s.total > 0 && getElapsed() >= s.total) {
       finishTimer();
+    }
+
+    function refreshControls(){
+      // decide visibility and labels according to state
+      if (!s.running && !s.currentSession){
+        // idle
+        startBtn.textContent = 'Iniciar'; startBtn.disabled = false;
+        if (stopBtn) stopBtn.style.display = 'none';
+        if (changeBtn) changeBtn.style.display = 'none';
+        if (finishBtn) finishBtn.style.display = 'none';
+      } else if (s.running){
+        startBtn.textContent = 'Pausar'; startBtn.disabled = false;
+        if (stopBtn) stopBtn.style.display = '';
+        if (changeBtn) changeBtn.style.display = '';
+        if (finishBtn) finishBtn.style.display = 'none';
+      } else if (!s.running && s.currentSession !== null){
+        // paused or waiting finalization
+        startBtn.textContent = 'Reanudar'; startBtn.disabled = false;
+        if (stopBtn) stopBtn.style.display = '';
+        if (changeBtn) changeBtn.style.display = '';
+        if (finishBtn) finishBtn.style.display = 'none';
+      }
     }
 
     startBtn.addEventListener('click', () => {
       if (!s.running){
         // start or resume
-        const mins = parseInt(durationSel.value, 10) || 0;
+        const mins = parseInt(durationSel.value, 10) || (s.selectedMinutes || 0);
         if (!s.total) s.total = mins * 60;
         // start a new session record if none active
         if (s.currentSession === null) {
@@ -248,6 +330,7 @@
         if (changeBtn) changeBtn.style.display = '';
         saveStateToStorage();
       }
+      refreshControls();
       updatePanelTotal();
     });
     // stop (detener) - stop early but charge full amount
@@ -274,13 +357,19 @@
         // hide change and stop buttons
         if (changeBtn) changeBtn.style.display = 'none';
         if (stopBtn) stopBtn.style.display = 'none';
-        // reset current session pointer
+        // mark session settled already done above; reset UI counters
         s.currentSession = null;
+        s.accumulated = 0; s.total = 0; s.plannedAmount = 0;
+        // reset bar and timing display
+        if (elapsedEl) elapsedEl.textContent = '00:00:00';
+        if (totalEl) totalEl.textContent = fmt(0);
+        if (fill) fill.style.width = '0%';
         // make Iniciar available again
         startBtn.textContent = 'Iniciar'; startBtn.disabled = false;
         saveStateToStorage();
         updateUI();
         updatePanelTotal();
+        refreshControls();
       });
     }
 
@@ -367,9 +456,15 @@
         startBtn.disabled = false; finishBtn.style.display = 'none';
         if (changeBtn) changeBtn.style.display = 'none';
         s.currentSession = null;
+        // reset UI counters after finalizing
+        s.accumulated = 0; s.total = 0; s.plannedAmount = 0;
+        if (elapsedEl) elapsedEl.textContent = '00:00:00';
+        if (totalEl) totalEl.textContent = fmt(0);
+        if (fill) fill.style.width = '0%';
         saveStateToStorage();
         updateUI();
         updatePanelTotal();
+        refreshControls();
       });
     }
   }
