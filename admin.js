@@ -58,9 +58,13 @@
       return;
     }
     try {
-      // read image file, crop/resize to square on client side, then send as Blob via FormData
-      const canvasDataUrl = await fileToSquareDataUrl(file, 512);
-      const blob = dataURLToBlob(canvasDataUrl);
+      // determine blob to send: prefer preparedBlob from manual cropper if present
+      let blob = preparedBlob || null;
+      if (!blob && file) {
+        // fallback: auto center-crop and resize
+        const canvasDataUrl = await fileToSquareDataUrl(file, 512);
+        blob = dataURLToBlob(canvasDataUrl);
+      }
       const form = new FormData();
       form.append('name', name);
       form.append('number', number);
@@ -112,6 +116,9 @@
     while(n--) u8[n] = bstr.charCodeAt(n);
     return new Blob([u8], { type: mime });
   }
+
+  // prepared blob from cropper (if user confirms manual crop)
+  let preparedBlob = null;
 
   // small toast utility (type: success|error|warning)
   function showToast(text, ms = 4000, type = 'info'){
@@ -228,7 +235,7 @@
     }
 
     if (imgInput){
-      imgInput.addEventListener('change', (e) => { const file = imgInput.files && imgInput.files[0]; showFilePreview(file); });
+      imgInput.addEventListener('change', (e) => { const file = imgInput.files && imgInput.files[0]; handleFileSelected(file); });
     }
     if (dropzone){
       dropzone.addEventListener('click', () => imgInput && imgInput.click());
@@ -239,10 +246,77 @@
         const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
         if (f && imgInput){
           // assign file to input
-          const dt = new DataTransfer(); dt.items.add(f); imgInput.files = dt.files; showFilePreview(f);
+          const dt = new DataTransfer(); dt.items.add(f); imgInput.files = dt.files; handleFileSelected(f);
         }
       });
     }
+
+    // --- Cropper UI logic ---
+    const cropPanel = document.getElementById('cropPanel');
+    const cropViewport = document.getElementById('cropViewport');
+    const cropImage = document.getElementById('cropImage');
+    const cropZoom = document.getElementById('cropZoom');
+    const confirmCrop = document.getElementById('confirmCrop');
+    const cancelCrop = document.getElementById('cancelCrop');
+
+    let cx = 0, cy = 0, scale = 1, imgW = 0, imgH = 0, dragging = false, startX = 0, startY = 0, startCx = 0, startCy = 0;
+
+    function handleFileSelected(file){
+      if (!file) return;
+      showFilePreview(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        cropImage.src = reader.result;
+        cropPanel.style.display = '';
+        preparedBlob = null;
+        cropImage.onload = () => {
+          imgW = cropImage.naturalWidth; imgH = cropImage.naturalHeight;
+          // initial scale so image covers viewport
+          const vp = cropViewport.getBoundingClientRect();
+          const fit = Math.max(vp.width / imgW, vp.height / imgH);
+          scale = Math.max(fit, 1);
+          cropZoom.value = scale.toFixed(2);
+          cx = 0; cy = 0; applyTransform();
+        };
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function applyTransform(){
+      cropImage.style.transform = `translate(${cx}px, ${cy}px) scale(${scale})`;
+    }
+
+    // drag handlers
+    cropImage.addEventListener('pointerdown', (e) => { e.preventDefault(); dragging = true; startX = e.clientX; startY = e.clientY; startCx = cx; startCy = cy; cropImage.setPointerCapture && cropImage.setPointerCapture(e.pointerId); cropImage.style.cursor = 'grabbing'; });
+    cropImage.addEventListener('pointermove', (e) => { if (!dragging) return; const dx = e.clientX - startX; const dy = e.clientY - startY; cx = startCx + dx; cy = startCy + dy; applyTransform(); });
+    cropImage.addEventListener('pointerup', (e) => { dragging = false; cropImage.releasePointerCapture && cropImage.releasePointerCapture(e.pointerId); cropImage.style.cursor = 'grab'; });
+    cropImage.addEventListener('pointercancel', () => { dragging = false; });
+
+    cropZoom.addEventListener('input', (e) => { scale = parseFloat(e.target.value) || 1; applyTransform(); });
+
+    cancelCrop.addEventListener('click', (e) => { e.preventDefault(); cropPanel.style.display = 'none'; preparedBlob = null; document.getElementById('createStation').reset(); document.getElementById('imagePreview').innerHTML = ''; });
+
+    confirmCrop.addEventListener('click', (e) => {
+      e.preventDefault();
+      const vp = cropViewport.getBoundingClientRect();
+      const size = Math.min(512, Math.round(vp.width));
+      const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const imgDisplayW = imgW * scale; const imgDisplayH = imgH * scale;
+      const imgLeft = cx + (cropViewport.clientWidth - imgDisplayW) / 2;
+      const imgTop = cy + (cropViewport.clientHeight - imgDisplayH) / 2;
+      const sx = Math.max(0, (0 - imgLeft) / scale);
+      const sy = Math.max(0, (0 - imgTop) / scale);
+      const sSize = Math.min(imgW - sx, imgH - sy, vp.width / scale, vp.height / scale);
+      ctx.fillStyle = '#fff'; ctx.fillRect(0,0,size,size);
+      ctx.drawImage(cropImage, sx, sy, sSize, sSize, 0, 0, size, size);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      preparedBlob = dataURLToBlob(dataUrl);
+      document.getElementById('imagePreview').innerHTML = '';
+      const thumb = new Image(); thumb.src = dataUrl; thumb.style.width = '120px'; thumb.style.height = '120px'; thumb.style.objectFit = 'cover'; thumb.style.borderRadius = '6px';
+      document.getElementById('imagePreview').appendChild(thumb);
+      cropPanel.style.display = 'none';
+    });
   }
 
   document.addEventListener('DOMContentLoaded', () => {

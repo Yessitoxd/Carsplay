@@ -149,6 +149,14 @@ body.admin-auth .card{border-radius:12px}
 .station-list-scroll{max-height:320px;overflow-y:auto;padding-right:6px}
 .station-row{padding:8px 10px;border-bottom:1px solid rgba(0,0,0,0.04);}
 
+/* Cropper styles */
+.crop-panel{margin-top:10px;padding:12px;border:1px solid rgba(0,0,0,0.04);border-radius:8px;background:#fff}
+.crop-viewport{width:220px;height:220px;border-radius:8px;overflow:hidden;border:1px solid rgba(0,0,0,0.06);display:flex;align-items:center;justify-content:center;background:#f7f7f7}
+.crop-viewport img{user-select:none;touch-action:none;cursor:grab;max-width:none}
+.crop-controls{margin-top:10px}
+.crop-actions{display:flex;gap:8px;margin-top:8px}
+.crop-hint{font-size:12px;color:#666;margin-top:8px}
+
 /* Admin panel layout */
 .admin-shell{display:flex;gap:18px;align-items:stretch}
 .admin-sidebar{width:220px;background:transparent}

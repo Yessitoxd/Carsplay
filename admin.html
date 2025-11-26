@@ -49,6 +49,21 @@
             </div>
             <input id="s-image" name="image" type="file" accept="image/*" required hidden>
             <div id="imagePreview" aria-hidden="true" style="margin-top:8px"></div>
+            <!-- Cropper modal / panel -->
+            <div id="cropPanel" class="crop-panel" style="display:none">
+              <p><strong>Así va a quedar su imagen</strong></p>
+              <div class="crop-viewport" id="cropViewport">
+                <img id="cropImage" alt="crop preview" src="" draggable="false">
+              </div>
+              <div class="crop-controls">
+                <label>Zoom <input id="cropZoom" type="range" min="0.5" max="3" step="0.01" value="1"></label>
+                <div class="crop-actions">
+                  <button id="cancelCrop" class="btn secondary">Cancelar</button>
+                  <button id="confirmCrop" class="btn primary">Usar imagen recortada</button>
+                </div>
+                <p class="crop-hint">Si no te gusta, ajusta la posición y zoom para acomodarla al 1:1</p>
+              </div>
+            </div>
           </div>
 
           <form id="createStation" enctype="multipart/form-data" style="margin-top:14px">
