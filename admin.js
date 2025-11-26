@@ -49,12 +49,14 @@
     [numEl, fileEl].forEach(el => el.classList && el.classList.remove('invalid'));
 
     const missing = [];
-    if (!number && number !== 0) missing.push(numEl);
-    if (!file) missing.push(fileEl);
+    if (!number && number !== 0) missing.push({ el: numEl, label: 'Número' });
+    // Accept either an actual selected file or a preparedBlob from the cropper
+    if (!file && !preparedBlob) missing.push({ el: fileEl, label: 'Imagen' });
     if (missing.length) {
-      missing.forEach(el => el.classList && el.classList.add('invalid'));
-      missing[0].focus();
-      showToast('Completa los campos marcados', 4000, 'warning');
+      missing.forEach(item => item.el.classList && item.el.classList.add('invalid'));
+      try { missing[0].el.focus(); } catch (e) {}
+      if (missing.length === 1) showToast('Completa el campo: ' + missing[0].label, 4000, 'warning');
+      else showToast('Completa los campos marcados', 4000, 'warning');
       return;
     }
     try {
@@ -238,7 +240,14 @@
       imgInput.addEventListener('change', (e) => { const file = imgInput.files && imgInput.files[0]; handleFileSelected(file); });
     }
     if (dropzone){
-      dropzone.addEventListener('click', () => imgInput && imgInput.click());
+      // Only open file selector when clicking the dropzone itself — ignore clicks inside cropPanel or preview
+      dropzone.addEventListener('click', (e) => {
+        const cropPanelLocal = document.getElementById('cropPanel');
+        if (cropPanelLocal && cropPanelLocal.style && cropPanelLocal.style.display !== 'none' && cropPanelLocal.contains(e.target)) return;
+        const previewLocal = document.getElementById('imagePreview');
+        if (previewLocal && previewLocal.contains(e.target)) return;
+        imgInput && imgInput.click();
+      });
       dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dz-hover'); });
       dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dz-hover'));
       dropzone.addEventListener('drop', (e) => {
