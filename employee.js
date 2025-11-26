@@ -541,18 +541,8 @@
       setOpen(!isOpen);
     });
 
-    // Close panel when clicking outside of it for convenience
-    document.addEventListener('click', (ev) => {
-      const target = ev.target;
-      if (!panel.contains(target) && !toggle.contains(target)) {
-        setOpen(false);
-      }
-    });
-
-    // Allow Escape key to close the panel
-    document.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Escape') setOpen(false);
-    });
+    // NOTE: panel only opens/closes via the user name toggle.
+    // Do not close on outside clicks or Escape to preserve user preference.
 
     logoutBtn.addEventListener('click', () => {
       localStorage.removeItem(USER_KEY);
