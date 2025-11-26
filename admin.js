@@ -56,7 +56,7 @@
       const token = localStorage.getItem('carsplay_token');
       const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
       const res = await fetch((base || '') + '/api/stations/' + id, { method: 'DELETE', headers });
-      if (!res.ok) { const txt = await res.text(); alert('Error eliminando: ' + txt); return; }
+      if (!res.ok) { await handleFetchError(res); return; }
       showToast('Estación eliminada', 3000, 'success');
       await loadStations();
     } catch (e) { console.error(e); alert('Error eliminando estación'); }
@@ -84,8 +84,7 @@
         const res = await fetch((base || '') + '/api/stations/' + station._id, {
           method: 'PUT', headers, body: JSON.stringify({ number: newNumber })
         });
-        if (res.status === 409) { alert('Ese número ya está ocupado'); return; }
-        if (!res.ok) { const txt = await res.text(); alert('Error: ' + txt); return; }
+        if (!res.ok) { await handleFetchError(res, { number: newNumber }); return; }
         showToast('Estación actualizada', 3000, 'success');
         modal.style.display = 'none';
         await loadStations();
@@ -136,7 +135,7 @@
       const res = await fetch((base || '') + '/api/stations', {
         method: 'POST', headers, body: form
       });
-      if (!res.ok) { const txt = await res.text(); showToast('Error: ' + txt, 4000, 'error'); return; }
+      if (!res.ok) { await handleFetchError(res, { number }); return; }
       // success
       document.getElementById('createStation').reset();
       document.getElementById('imagePreview').innerHTML = '';
@@ -196,6 +195,41 @@
     setTimeout(() => {
       t.style.opacity = '0';
     }, ms);
+  }
+
+  // Handle non-OK fetch responses and show friendly toasts for known error codes
+  async function handleFetchError(res, context = {}){
+    try {
+      if (res.status === 409) {
+        // try parse JSON error body
+        let body = null;
+        try { body = await res.json(); } catch(e) { body = null; }
+        const code = body && body.error ? body.error : null;
+        if (code === 'number_taken') {
+          showToast('Ese número ya está ocupado', 4000, 'error');
+          return true;
+        }
+        if (code === 'minutes_taken') {
+          const mins = context && context.minutes ? context.minutes : null;
+          if (mins) showToast(`Ya existe una tarifa para ${mins} minutos`, 4000, 'error');
+          else showToast('Ya existe una tarifa para esos minutos', 4000, 'error');
+          return true;
+        }
+        // fallback for other 409 payloads: prefer a human message if provided
+        const txt = body && body.message ? body.message : (body ? JSON.stringify(body) : (await res.text().catch(()=>'')).toString());
+        showToast('Conflicto: ' + (txt || 'request conflict'), 4000, 'error');
+        return true;
+      }
+      // non-409 errors: try to read text or json
+      let text = null;
+      try { const j = await res.json(); text = j && (j.message || j.error) ? (j.message || j.error) : JSON.stringify(j); } catch(e){ text = await res.text().catch(()=>null); }
+      showToast('Error: ' + (text || 'Error en la solicitud'), 4000, 'error');
+      return true;
+    } catch (e){
+      console.error('handleFetchError', e);
+      showToast('Error en la solicitud', 4000, 'error');
+      return true;
+    }
   }
   // Sidebar navigation and additional admin features
   function showSection(name){
@@ -275,7 +309,7 @@
       const token = localStorage.getItem('carsplay_token');
       const headers = Object.assign({ 'Content-Type': 'application/json' }, token ? { 'Authorization': 'Bearer ' + token } : {});
       const res = await fetch((base || '') + '/api/time/rates', { method: 'POST', headers, body: JSON.stringify({ minutes, amount }) });
-      if (!res.ok) { const txt = await res.text(); showToast('Error: ' + txt, 4000, 'error'); return; }
+      if (!res.ok) { await handleFetchError(res, { minutes }); return; }
       minsEl.value = ''; amtEl.value = '';
       showToast('Tarifa añadida', 3000, 'success');
       await loadTimeRates();
@@ -311,7 +345,7 @@
       const token = localStorage.getItem('carsplay_token');
       const headers = Object.assign({ 'Content-Type': 'application/json' }, token ? { 'Authorization': 'Bearer ' + token } : {});
       const res = await fetch((base || '') + '/api/time/rates/' + currentEditingRate._id, { method: 'PUT', headers, body: JSON.stringify({ minutes: mins, amount: amt }) });
-      if (!res.ok) { const txt = await res.text(); showToast('Error: ' + txt, 4000, 'error'); return; }
+      if (!res.ok) { await handleFetchError(res, { minutes: mins }); return; }
       showToast('Tarifa actualizada', 3000, 'success');
       document.getElementById('timeRateModal').style.display = 'none';
       currentEditingRate = null;
@@ -326,7 +360,7 @@
       const token = localStorage.getItem('carsplay_token');
       const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
       const res = await fetch((base || '') + '/api/time/rates/' + id, { method: 'DELETE', headers });
-      if (!res.ok) { const txt = await res.text(); showToast('Error: ' + txt, 4000, 'error'); return; }
+      if (!res.ok) { await handleFetchError(res); return; }
       showToast('Tarifa eliminada', 3000, 'success');
       await loadTimeRates();
     } catch (e){ console.error(e); showToast('Error eliminando tarifa', 3000, 'error'); }

@@ -109,6 +109,9 @@ app.post('/api/time/rates', verifyToken, requireAdmin, async (req, res) => {
     const amount = Number(req.body.amount);
     if (!minutes || minutes <= 0) return res.status(400).json({ ok: false, error: 'invalid_minutes' });
     if (isNaN(amount) || amount < 0) return res.status(400).json({ ok: false, error: 'invalid_amount' });
+    // ensure minutes uniqueness
+    const exists = await TimeRate.findOne({ minutes }).exec();
+    if (exists) return res.status(409).json({ ok: false, error: 'minutes_taken', message: `Ya existe una tarifa para ${minutes} minutos` });
     const r = new TimeRate({ minutes, amount });
     await r.save();
     return res.status(201).json(r);
@@ -127,6 +130,11 @@ app.put('/api/time/rates/:id', verifyToken, requireAdmin, async (req, res) => {
     const update = {};
     if (minutes !== undefined) update.minutes = minutes;
     if (amount !== undefined) update.amount = amount;
+    // if minutes provided, ensure uniqueness among others
+    if (minutes !== undefined) {
+      const clash = await TimeRate.findOne({ minutes, _id: { $ne: id } }).exec();
+      if (clash) return res.status(409).json({ ok: false, error: 'minutes_taken', message: `Ya existe una tarifa para ${minutes} minutos` });
+    }
     const updated = await TimeRate.findByIdAndUpdate(id, update, { new: true }).exec();
     if (!updated) return res.status(404).json({ ok: false, error: 'not_found' });
     return res.json(updated);
@@ -178,7 +186,7 @@ app.post('/api/stations', verifyToken, requireAdmin, upload.single('image'), asy
 
     // ensure number uniqueness
     const existing = await Station.findOne({ number }).exec();
-    if (existing) return res.status(409).json({ ok: false, error: 'number_taken' });
+    if (existing) return res.status(409).json({ ok: false, error: 'number_taken', message: 'Ese número ya está ocupado' });
 
     const station = new Station({ name, number, image: imageUrl });
     await station.save();
@@ -197,7 +205,7 @@ app.put('/api/stations/:id', verifyToken, requireAdmin, upload.single('image'), 
     // if number provided, ensure uniqueness among others
     if (number !== undefined) {
       const clash = await Station.findOne({ number, _id: { $ne: id } }).exec();
-      if (clash) return res.status(409).json({ ok: false, error: 'number_taken' });
+      if (clash) return res.status(409).json({ ok: false, error: 'number_taken', message: 'Ese número ya está ocupado' });
     }
 
     const update = {};
