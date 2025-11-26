@@ -204,30 +204,43 @@
     if (downloadBtn) downloadBtn.addEventListener('click', downloadReport);
     const updateBtn = document.getElementById('updatePrice');
     if (updateBtn) updateBtn.addEventListener('click', updatePrice);
-    // preview image when selected
+    // image input and dropzone behavior
     const imgInput = document.getElementById('s-image');
-    if (imgInput){
-      imgInput.addEventListener('change', (e) => {
-        const file = imgInput.files && imgInput.files[0];
-        const preview = document.getElementById('imagePreview');
-        preview.innerHTML = '';
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-          const img = new Image(); img.src = reader.result;
-          img.style.maxWidth = '120px'; img.style.maxHeight = '120px'; img.style.objectFit = 'cover'; img.style.borderRadius = '6px';
-          // show dimension hint and validation
-          img.onload = () => {
-            // if not square, show a small note that it will be auto-cropped
-            if (img.naturalWidth !== img.naturalHeight){
-              const note = document.createElement('div'); note.className = 'image-note'; note.textContent = 'La imagen será recortada/ajustada a 1:1';
-              preview.appendChild(img); preview.appendChild(note);
-            } else {
-              preview.appendChild(img);
-            }
-          };
+    const dropzone = document.getElementById('imageDropzone');
+    const preview = document.getElementById('imagePreview');
+    function showFilePreview(file){
+      preview.innerHTML = '';
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image(); img.src = reader.result;
+        img.style.width = '120px'; img.style.height = '120px'; img.style.objectFit = 'cover'; img.style.borderRadius = '6px';
+        img.onload = () => {
+          if (img.naturalWidth !== img.naturalHeight){
+            const note = document.createElement('div'); note.className = 'image-note'; note.textContent = 'La imagen será recortada/ajustada a 1:1';
+            preview.appendChild(img); preview.appendChild(note);
+          } else {
+            preview.appendChild(img);
+          }
         };
-        reader.readAsDataURL(file);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    if (imgInput){
+      imgInput.addEventListener('change', (e) => { const file = imgInput.files && imgInput.files[0]; showFilePreview(file); });
+    }
+    if (dropzone){
+      dropzone.addEventListener('click', () => imgInput && imgInput.click());
+      dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dz-hover'); });
+      dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dz-hover'));
+      dropzone.addEventListener('drop', (e) => {
+        e.preventDefault(); dropzone.classList.remove('dz-hover');
+        const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f && imgInput){
+          // assign file to input
+          const dt = new DataTransfer(); dt.items.add(f); imgInput.files = dt.files; showFilePreview(f);
+        }
       });
     }
   }

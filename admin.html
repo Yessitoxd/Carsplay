@@ -39,22 +39,30 @@
 
         <div id="section-addCarritos" class="admin-section" style="display:none">
           <h2>Añadir Carritos</h2>
-          <form id="createStation" enctype="multipart/form-data">
-              <!-- El nombre no lo elige el cliente; lo ponemos nosotros como 'Carrito' -->
-              <p>El nombre de la estación será: <strong>Carrito</strong></p>
 
-              <label for="s-number">Número (requerido)</label>
-              <input id="s-number" name="number" type="number" required>
+          <!-- Image dropzone (aesthetic) -->
+          <div id="imageDropzone" class="image-dropzone" tabindex="0">
+            <div class="dz-inner">
+              <div class="dz-icon">📷</div>
+              <div class="dz-text">Arrastra la imagen aquí o haz click para seleccionarla</div>
+              <div class="dz-sub">La imagen será recortada a formato 1:1</div>
+            </div>
+            <input id="s-image" name="image" type="file" accept="image/*" required hidden>
+            <div id="imagePreview" aria-hidden="true" style="margin-top:8px"></div>
+          </div>
 
-              <label for="s-image">Imagen (1:1, se recortará/ajustará automáticamente)</label>
-              <input id="s-image" name="image" type="file" accept="image/*" required>
-              <div id="imagePreview" aria-hidden="true" style="margin-top:8px"></div>
+          <form id="createStation" enctype="multipart/form-data" style="margin-top:14px">
+            <p>El nombre de la estación será: <strong>Carrito</strong></p>
 
-              <button class="btn primary" type="submit">Crear estación</button>
-            </form>
+            <label for="s-number">Número (requerido)</label>
+            <input id="s-number" name="number" type="number" required>
+
+            <button class="btn primary" type="submit">Crear estación</button>
+          </form>
+
           <hr>
           <h3>Estaciones existentes</h3>
-          <div id="stationList"></div>
+          <div id="stationList" class="station-list-scroll"></div>
         </div>
 
         <div id="section-addPrices" class="admin-section" style="display:none">
