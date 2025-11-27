@@ -16,9 +16,9 @@
   (function probeAlarm(){
     // try candidates sequentially; assign alarmAudio when one resolves
     const tryNext = (i) => {
-      if (i >= ALARM_CANDIDATES.length) {
+        if (i >= ALARM_CANDIDATES.length) {
         console.warn('Alarm.wav not found at any candidate path');
-        showToast && showToast('Alarma no encontrada (Alarm.wav)', 4000, 'warning');
+        if (typeof showToast === 'function') showToast('Alarma no encontrada (Alarm.wav)', 4000, 'warning');
         alarmAudio = null;
         return;
       }
@@ -34,7 +34,7 @@
         } else {
           tryNext(i+1);
         }
-      }).catch(() => { tryNext(i+1); });
+        }).catch(() => { tryNext(i+1); });
     };
     tryNext(0);
   })();
@@ -272,6 +272,17 @@
 
     function refreshControls(){
       // decide visibility and labels according to state
+      // completed state: elapsed >= total (show only Finalizar / Otra ronda)
+      const elapsed = getElapsed();
+      const completed = (s.total && elapsed >= s.total);
+      if (completed){
+        startBtn.textContent = 'Iniciar'; startBtn.disabled = true;
+        if (stopBtn) stopBtn.style.display = 'none';
+        if (changeBtn) { changeBtn.style.display = ''; changeBtn.textContent = 'Otra ronda'; }
+        if (finishBtn) finishBtn.style.display = '';
+        return;
+      }
+
       if (!s.running && !s.currentSession){
         // idle
         startBtn.textContent = 'Iniciar'; startBtn.disabled = false;
@@ -284,7 +295,7 @@
         if (changeBtn) changeBtn.style.display = '';
         if (finishBtn) finishBtn.style.display = 'none';
       } else if (!s.running && s.currentSession !== null){
-        // paused or waiting finalization
+        // paused (but not completed)
         startBtn.textContent = 'Reanudar'; startBtn.disabled = false;
         if (stopBtn) stopBtn.style.display = '';
         if (changeBtn) changeBtn.style.display = '';
