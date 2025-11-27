@@ -53,6 +53,18 @@ app.get('/employee.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'employee.html'));
 });
 
+// Serve Alarm.wav explicitly from repo root (improves reliability on some hosts)
+const ALARM_FILE = path.join(__dirname, 'Alarm.wav');
+app.get('/Alarm.wav', (req, res) => {
+  try {
+    if (fs.existsSync(ALARM_FILE)) return res.sendFile(ALARM_FILE);
+    return res.status(404).end();
+  } catch (e) {
+    console.error('Alarm serve error', e);
+    return res.status(500).end();
+  }
+});
+
 // Serve frontend static files from repository root (index.html, styles.css, login.js, dashboard.html)
 app.use(express.static(path.join(__dirname)));
 
