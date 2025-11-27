@@ -13,6 +13,7 @@
   ALARM_CANDIDATES.push('./Alarm.wav');
   ALARM_CANDIDATES.push('Alarm.wav');
   let alarmAudio = null;
+  let SOUND_UNLOCKED = false;
   (function probeAlarm(){
     // try candidates sequentially; assign alarmAudio when one resolves
     const tryNext = (i) => {
@@ -108,7 +109,7 @@
       <div class="times"><div class="elapsed">00:00:00</div><div class="total">00:00:00</div></div>
       <div class="bar"><div class="bar-fill" style="width:0%"></div></div>
       <div class="controls">${selectHtml}<div class="price">C$ <span class="amount">${station.price || 0}</span></div></div>
-      <div class="buttons"><button class="start">Iniciar</button><button class="pause-change" style="display:none">Detener</button><button class="change" style="display:none">Cambiar Carrito</button><button class="finish" style="display:none">Finalizar</button></div>
+      <div class="buttons"><button class="start">Iniciar</button><button class="pause-change" style="display:none">Detener</button><button class="change" style="display:none">Cambiar Carrito</button><button class="finish" style="display:none">Finalizar</button><button class="enable-sound" style="margin-left:8px">Habilitar sonido</button></div>
     `;
 
     return div;
@@ -140,6 +141,39 @@
       return base;
     }
 
+    // enable-sound button
+    const enableSoundBtn = card.querySelector('.enable-sound');
+    if (enableSoundBtn){
+      enableSoundBtn.addEventListener('click', async () => {
+        try {
+          if (alarmAudio){
+            // try quick play/pause to unlock autoplay in browsers
+            await alarmAudio.play().catch(()=>{});
+            try { alarmAudio.pause(); alarmAudio.currentTime = 0; } catch(e){}
+            s.soundEnabled = true;
+            enableSoundBtn.style.display = 'none';
+            if (typeof showToast === 'function') showToast('Sonido habilitado', 2000, 'success');
+            return;
+          }
+          // fallback: create/resume AudioContext to unlock audio for future oscillator
+          if (!window._carsplay_audio_ctx){
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (Ctx){
+              window._carsplay_audio_ctx = new Ctx();
+            }
+          }
+          if (window._carsplay_audio_ctx){
+            await window._carsplay_audio_ctx.resume();
+            s.soundEnabled = true;
+            enableSoundBtn.style.display = 'none';
+            if (typeof showToast === 'function') showToast('Sonido habilitado (fallback)', 2000, 'success');
+          } else {
+            if (typeof showToast === 'function') showToast('No se pudo habilitar sonido', 3000, 'warning');
+          }
+        } catch(e){ console.warn('enable sound failed', e); }
+      });
+    }
+
     // restore persisted state if present
     if (persisted){
       s.running = !!persisted.running;
@@ -149,7 +183,25 @@
       s.plannedAmount = persisted.plannedAmount || 0;
       s.sessions = persisted.sessions || [];
       s.currentSession = persisted.currentSession !== undefined ? persisted.currentSession : null;
+      // validate currentSession index: clear if invalid
+      if (s.currentSession !== null){
+        if (!Array.isArray(s.sessions) || !s.sessions[s.currentSession]){
+          s.currentSession = null;
+        }
+      }
       s.selectedMinutes = persisted.selectedMinutes || s.selectedMinutes || null;
+      // Auto-settle any sessions that ended some seconds ago to avoid 'pendiente de finalizar' on reload
+      try {
+        const NOW = Date.now();
+        const AUTO_SETTLE_MS = 5000; // 5 seconds
+        if (Array.isArray(s.sessions)){
+          s.sessions.forEach(sess => {
+            if (sess && sess.end && !sess.settled && (NOW - sess.end) > AUTO_SETTLE_MS){
+              sess.settled = true;
+            }
+          });
+        }
+      } catch(e){}
       // if there is no active or unfinished session, clear elapsed/total so the card starts at 0
       const hasUnsettled = Array.isArray(s.sessions) && s.sessions.some(sess => sess && !sess.settled);
       const hasActive = s.running || (s.currentSession !== null) || hasUnsettled;
@@ -306,6 +358,20 @@
     startBtn.addEventListener('click', () => {
       if (!s.running){
         // start or resume
+        // Use this user gesture to attempt unlocking audio playback (play+pause)
+        if (alarmAudio && !SOUND_UNLOCKED){
+          try {
+            const p = alarmAudio.play();
+            if (p && typeof p.then === 'function'){
+              p.then(() => {
+                try { alarmAudio.pause(); alarmAudio.currentTime = 0; } catch(e){}
+                SOUND_UNLOCKED = true;
+              }).catch(()=>{/* ignore */});
+            } else {
+              try { alarmAudio.pause(); alarmAudio.currentTime = 0; SOUND_UNLOCKED = true; } catch(e){}
+            }
+          } catch (e) { /* ignore - cannot unlock */ }
+        }
         const mins = parseInt(durationSel.value, 10) || (s.selectedMinutes || 0);
         if (!s.total) s.total = mins * 60;
         // start a new session record if none active
