@@ -592,6 +592,24 @@
       const isOpen = document.body.classList.contains('panel-open');
       setOpen(!isOpen);
     });
+    // Also ensure clicking the name text toggles (some browsers/skins may target the span)
+    const nameEl = document.getElementById('employeeName');
+    if (nameEl){
+      nameEl.style.cursor = 'pointer';
+      nameEl.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const isOpen = document.body.classList.contains('panel-open');
+        setOpen(!isOpen);
+      });
+    }
+    // Allow keyboard toggle with Enter/Space on the toggle button
+    toggle.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' || ev.key === ' '){
+        ev.preventDefault();
+        const isOpen = document.body.classList.contains('panel-open');
+        setOpen(!isOpen);
+      }
+    });
 
     // NOTE: panel only opens/closes via the user name toggle.
     // Do not close on outside clicks or Escape to preserve user preference.
