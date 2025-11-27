@@ -112,7 +112,7 @@
       <div class="times"><div class="elapsed">00:00:00</div><div class="total">00:00:00</div></div>
       <div class="bar"><div class="bar-fill" style="width:0%"></div></div>
       <div class="controls">${selectHtml}<div class="price">C$ <span class="amount">${station.price || 0}</span></div></div>
-      <div class="buttons"><button class="start">Iniciar</button><button class="pause-change" style="display:none">Detener</button><button class="change" style="display:none">Cambiar Carrito</button><button class="finish" style="display:none">Finalizar</button><button class="enable-sound" style="margin-left:8px">Habilitar sonido</button></div>
+      <div class="buttons"><button class="start">Iniciar</button><button class="pause-change" style="display:none">Detener</button><button class="change" style="display:none">Cambiar Carrito</button><button class="finish" style="display:none">Finalizar</button></div>
     `;
 
     return div;
@@ -144,38 +144,7 @@
       return base;
     }
 
-    // enable-sound button
-    const enableSoundBtn = card.querySelector('.enable-sound');
-    if (enableSoundBtn){
-      enableSoundBtn.addEventListener('click', async () => {
-        try {
-          if (alarmAudio){
-            // try quick play/pause to unlock autoplay in browsers
-            await alarmAudio.play().catch(()=>{});
-            try { alarmAudio.pause(); alarmAudio.currentTime = 0; } catch(e){}
-            s.soundEnabled = true;
-            enableSoundBtn.style.display = 'none';
-            if (typeof showToast === 'function') showToast('Sonido habilitado', 2000, 'success');
-            return;
-          }
-          // fallback: create/resume AudioContext to unlock audio for future oscillator
-          if (!window._carsplay_audio_ctx){
-            const Ctx = window.AudioContext || window.webkitAudioContext;
-            if (Ctx){
-              window._carsplay_audio_ctx = new Ctx();
-            }
-          }
-          if (window._carsplay_audio_ctx){
-            await window._carsplay_audio_ctx.resume();
-            s.soundEnabled = true;
-            enableSoundBtn.style.display = 'none';
-            if (typeof showToast === 'function') showToast('Sonido habilitado (fallback)', 2000, 'success');
-          } else {
-            if (typeof showToast === 'function') showToast('No se pudo habilitar sonido', 3000, 'warning');
-          }
-        } catch(e){ console.warn('enable sound failed', e); }
-      });
-    }
+    // no separate enable-sound button: 'Iniciar' will be used as the unlocking gesture
 
     // restore persisted state if present
     if (persisted){
@@ -290,8 +259,8 @@
       } catch(e){}
       if (finishBtn) { finishBtn.style.display = ''; }
       if (changeBtn) { changeBtn.style.display = ''; changeBtn.textContent = 'Otra ronda'; }
-      // disable start until finalized or stopped
-      startBtn.disabled = true;
+      // hide start until finalized or stopped
+      startBtn.style.display = 'none';
       saveStateToStorage();
       updateUI();
       updatePanelTotal();
@@ -311,6 +280,7 @@
       if (Date.now() - s.startedAt < 0) s.startedAt = Date.now();
       // start interval
       if (!s.timer) s.timer = setInterval(tick, 1000);
+      startBtn.style.display = '';
       startBtn.textContent = 'Pausar';
       if (stopBtn) stopBtn.style.display = '';
       if (changeBtn) changeBtn.style.display = '';
@@ -331,7 +301,8 @@
       const elapsed = getElapsed();
       const completed = (s.total && elapsed >= s.total);
       if (completed){
-        startBtn.textContent = 'Iniciar'; startBtn.disabled = true;
+        // hide start completely while in completed state
+        if (startBtn) startBtn.style.display = 'none';
         if (stopBtn) stopBtn.style.display = 'none';
         if (changeBtn) { changeBtn.style.display = ''; changeBtn.textContent = 'Otra ronda'; }
         if (finishBtn) finishBtn.style.display = '';
@@ -445,6 +416,7 @@
         if (totalEl) totalEl.textContent = fmt(0);
         if (fill) fill.style.width = '0%';
         // make Iniciar available again
+        startBtn.style.display = '';
         startBtn.textContent = 'Iniciar'; startBtn.disabled = false;
         saveStateToStorage();
         updateUI();
@@ -463,7 +435,7 @@
           if (finishBtn) finishBtn.style.display = 'none';
           changeBtn.textContent = 'Cambiar Carrito';
           // allow starting a new session
-          startBtn.disabled = false; startBtn.textContent = 'Iniciar';
+          startBtn.style.display = ''; startBtn.disabled = false; startBtn.textContent = 'Iniciar';
           // reset currentSession so next start creates a new one
           s.currentSession = null;
           saveStateToStorage();
