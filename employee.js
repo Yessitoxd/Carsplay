@@ -522,14 +522,46 @@
   }
 
   function updatePanelTotal(){
-    // Sum only settled (finalized/stopped) session amounts
-    const total = Object.values(state).reduce((sum, s) => {
-      if (!s || !Array.isArray(s.sessions)) return sum;
-      const settled = s.sessions.reduce((ss, sess) => ss + ((sess && sess.settled && sess.amount) ? Number(sess.amount) : 0), 0);
-      return sum + settled;
-    }, 0);
-    const el = document.getElementById('panelTotal');
-    if (el) el.textContent = `C$ ${total}`;
+    // By default compute today's total based on client's local timezone
+    try {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0,0,0,0);
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23,59,59,999);
+      const total = Object.values(state).reduce((sum, s) => {
+        if (!s || !Array.isArray(s.sessions)) return sum;
+        const settled = s.sessions.reduce((ss, sess) => {
+          if (!sess || !sess.settled || !sess.end) return ss;
+          const t = Number(sess.end);
+          if (t >= start.getTime() && t <= end.getTime()) return ss + (Number(sess.amount) || 0);
+          return ss;
+        }, 0);
+        return sum + settled;
+      }, 0);
+      const el = document.getElementById('panelTotal');
+      if (el) el.textContent = `C$ ${total}`;
+      // update label with formatted date according to user's locale
+      const label = document.getElementById('panelTotalLabel');
+      if (label){
+        const fmt = now.toLocaleDateString(undefined, { year:'numeric', month:'2-digit', day:'2-digit' });
+        label.textContent = `Dinero obtenido (Hoy — ${fmt}):`;
+      }
+      // show user's hour format preference
+      const tf = document.getElementById('panelTimeFormat');
+      if (tf){
+        tf.textContent = `Formato horario: ${getUserPrefers24Hour() ? '24 horas' : '12 horas'}`;
+      }
+    } catch (e) { console.warn('updatePanelTotal failed', e); }
+  }
+
+  function getUserPrefers24Hour(){
+    try {
+      const opts = Intl.DateTimeFormat().resolvedOptions();
+      if (opts && typeof opts.hour12 === 'boolean') return !opts.hour12;
+      // Fallback: format a known hour and inspect
+      const sample = new Date(Date.UTC(2020,0,1,13,0,0));
+      const str = sample.toLocaleTimeString();
+      return !(/AM|PM/i.test(str));
+    } catch (e) { return true; }
   }
 
   async function loadStations(){
