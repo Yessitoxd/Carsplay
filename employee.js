@@ -12,6 +12,9 @@
   ALARM_CANDIDATES.push('/Alarm.wav');
   ALARM_CANDIDATES.push('./Alarm.wav');
   ALARM_CANDIDATES.push('Alarm.wav');
+  // CDN fallbacks (serve directly from GitHub via jsDelivr/raw)
+  ALARM_CANDIDATES.push('https://cdn.jsdelivr.net/gh/Yessitoxd/Carsplay@main/Alarm.wav');
+  ALARM_CANDIDATES.push('https://raw.githubusercontent.com/Yessitoxd/Carsplay/main/Alarm.wav');
   let alarmAudio = null;
   let SOUND_UNLOCKED = false;
   (function probeAlarm(){
