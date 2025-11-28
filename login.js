@@ -4,6 +4,11 @@
 // e.g. window.API_BASE = 'https://your-service.onrender.com';
 
 (function(){
+  // Ensure API_BASE is defined so login requests from Netlify go to the correct backend
+  if (!window.API_BASE) {
+    window.API_BASE = 'https://carsplay.onrender.com';
+    console.info('login.js: window.API_BASE not found — defaulting to', window.API_BASE);
+  }
   const form = document.querySelector('.login');
   if (!form) return;
 
