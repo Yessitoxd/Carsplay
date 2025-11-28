@@ -9,7 +9,6 @@ const User = require('./models/user');
 const Station = require('./models/station');
 const TimeRate = require('./models/timeRate');
 const TimeLog = require('./models/timeLog');
-const ExcelJS = require('exceljs');
 
 const app = express();
 const fs = require('fs');
@@ -407,6 +406,13 @@ app.get('/', (req, res) => res.json({ ok: true, message: 'CarsPlay Auth Service'
 // Generate XLSX report using template 'Reporte Plantilla.xlsx'
 app.get('/api/time/report.xlsx', async (req, res) => {
   try {
+    let ExcelJS = null;
+    try {
+      ExcelJS = require('exceljs');
+    } catch (e) {
+      console.error('exceljs module not available:', e && e.message);
+      return res.status(500).json({ ok: false, error: 'exceljs_missing', message: 'La dependencia exceljs no está instalada en el servidor. Por favor redeploy con package.json actualizado.' });
+    }
     const q = req.query || {};
     // parse start/end as in logs endpoint
     let startDate = q.start ? new Date(q.start) : null;
@@ -446,11 +452,19 @@ app.get('/api/time/report.xlsx', async (req, res) => {
       const yyyy = d.getFullYear();
       return `${dd}-${mm}-${yyyy}`;
     };
+    // Prefer explicit human-friendly labels sent by the client (to avoid UTC shifts)
+    const labelStart = q.labelStart ? String(q.labelStart) : null;
+    const labelEnd = q.labelEnd ? String(q.labelEnd) : null;
     const sLocal = new Date(startDate);
     const eLocal = new Date(endDate);
-    const title = (fmtDate(sLocal) === fmtDate(eLocal)) ? fmtDate(sLocal) : `${fmtDate(sLocal)} al ${fmtDate(eLocal)}`;
+    const computedStart = fmtDate(sLocal);
+    const computedEnd = fmtDate(eLocal);
+    const title = (labelStart && labelEnd)
+      ? (labelStart === labelEnd ? labelStart : `${labelStart} al ${labelEnd}`)
+      : (computedStart === computedEnd ? computedStart : `${computedStart} al ${computedEnd}`);
     // write title to H4 (column 8 row 4)
     ws.getCell('H4').value = title;
+    try { ws.getCell('H4').font = { bold: true }; } catch(e){}
 
     // compute totals
     let totalAmount = 0; let totalSeconds = 0; let totalsCount = 0; let rowIdx = 13; // headers are at row 12
@@ -478,6 +492,7 @@ app.get('/api/time/report.xlsx', async (req, res) => {
       ws.getCell('C' + rowIdx).value = emp;
       ws.getCell('D' + rowIdx).value = est;
       ws.getCell('E' + rowIdx).value = money;
+      try { ws.getCell('E' + rowIdx).numFmt = '#,##0.00'; } catch(e){}
       ws.getCell('F' + rowIdx).value = timeLabel;
       ws.getCell('G' + rowIdx).value = startTime;
       ws.getCell('H' + rowIdx).value = endTime;
@@ -491,31 +506,51 @@ app.get('/api/time/report.xlsx', async (req, res) => {
       const summaryRow = rowIdx + 1; // leave one empty row after data for visual separation
       // D -> total uses (e.g. "12 vueltas")
       ws.getCell('D' + summaryRow).value = `${totalsCount} vueltas`;
-      // E -> total amount
+      // E -> total amount (numeric)
       ws.getCell('E' + summaryRow).value = totalAmount;
-      // F -> total time formatted
+      try { ws.getCell('E' + summaryRow).numFmt = '#,##0.00'; } catch(e){}
+      // F -> total time formatted (text)
       const totalMins2 = Math.floor(totalSeconds/60);
       let totTimeLabel2 = '';
       if (totalMins2 < 60) totTimeLabel2 = `${totalMins2} m`; else { const h2 = Math.floor(totalMins2/60); const m2 = totalMins2%60; totTimeLabel2 = `${h2} h` + (m2 ? ` ${m2} m` : ''); }
       ws.getCell('F' + summaryRow).value = totTimeLabel2;
+      // style summary row cells as bold for visibility
+      try {
+        ws.getCell('D' + summaryRow).font = { bold: true };
+        ws.getCell('E' + summaryRow).font = { bold: true };
+        ws.getCell('F' + summaryRow).font = { bold: true };
+      } catch(e){}
     } catch (e) {
       console.warn('Could not write summary row to XLSX', e && e.message);
     }
 
-    // write totals: gains in G7? user wanted ganancias response in G7 and label in F7
+    // write totals: put label in F7 and numeric amount in G7 (as template expects)
+    try { ws.getCell('F7').value = 'Ganancias'; ws.getCell('F7').font = { bold: true }; } catch(e){}
     ws.getCell('G7').value = totalAmount;
+    try { ws.getCell('G7').numFmt = '#,##0.00'; ws.getCell('G7').font = { bold: true }; } catch(e){}
 
-    // write totals time in F? The user said 'Reporte del día está en F4 -> answer in H4' and 'Ganancias del dia esta en f7 -> respuesta en g7'
-    // additionally we can write total time in F? but user asked totals displayed in sheet under Tiempo column. We'll also set cell F7 to formatted total time.
+    // write totals time into H7 (so it isn't overwriting the F7 label); keep it human-readable
     const totalMins = Math.floor(totalSeconds/60);
     let totTimeLabel = '';
     if (totalMins < 60) totTimeLabel = `${totalMins} m`; else { const h = Math.floor(totalMins/60); const m = totalMins%60; totTimeLabel = `${h} h` + (m ? ` ${m} m` : ''); }
-    ws.getCell('F7').value = totTimeLabel;
+    try { ws.getCell('H7').value = totTimeLabel; ws.getCell('H7').font = { bold: true }; } catch(e){}
+
+    // Also write the report title into F4 and H4 to be robust if template uses either cell
+    try { ws.getCell('F4').value = title; ws.getCell('F4').font = { bold: true }; } catch(e){}
+    try { ws.getCell('H4').value = title; ws.getCell('H4').font = { bold: true }; } catch(e){}
 
     // send workbook as attachment
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    const sname = (fmtDate(sLocal) === fmtDate(eLocal)) ? `Reporte ${fmtDate(sLocal)}.xlsx` : `Reporte del ${fmtDate(sLocal)} al ${fmtDate(eLocal)}.xlsx`;
-    res.setHeader('Content-Disposition', `attachment; filename="${sname.replace(/\s+/g,'_')}"`);
+    // Build filename using labels if provided to match user's local selection
+    const fname = (labelStart && labelEnd)
+      ? (labelStart === labelEnd ? `Reporte del ${labelStart}.xlsx` : `Reportes del ${labelStart} al ${labelEnd}.xlsx`)
+      : (computedStart === computedEnd ? `Reporte del ${computedStart}.xlsx` : `Reportes del ${computedStart} al ${computedEnd}.xlsx`);
+    // Set Content-Disposition with UTF-8 filename* plus fallback filename
+    try {
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fname)}; filename="${fname.replace(/"/g,'') }"`);
+    } catch (e) {
+      res.setHeader('Content-Disposition', `attachment; filename="${fname.replace(/\s+/g,'_')}"`);
+    }
     await wb.xlsx.write(res);
     res.end();
   } catch (e) {

@@ -264,10 +264,15 @@
       if (start) {
         const sLocal = new Date(start + 'T00:00:00');
         q.push('start=' + encodeURIComponent(new Date(sLocal.getTime()).toISOString()));
+        // include a human-friendly label for the server to use in filenames/titles
+        const ds = `${String(sLocal.getDate()).padStart(2,'0')}-${String(sLocal.getMonth()+1).padStart(2,'0')}-${sLocal.getFullYear()}`;
+        q.push('labelStart=' + encodeURIComponent(ds));
       }
       if (end) {
         const eLocal = new Date(end + 'T23:59:59');
         q.push('end=' + encodeURIComponent(new Date(eLocal.getTime()).toISOString()));
+        const de = `${String(eLocal.getDate()).padStart(2,'0')}-${String(eLocal.getMonth()+1).padStart(2,'0')}-${eLocal.getFullYear()}`;
+        q.push('labelEnd=' + encodeURIComponent(de));
       }
       if (stationSelect && stationSelect.value) {
         // stationSelect stores stationId in option value when available, otherwise empty
