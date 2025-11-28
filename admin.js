@@ -326,6 +326,9 @@
     const endLabel = document.createElement('label'); endLabel.textContent = 'Fecha fin:'; const endInput = document.createElement('input'); endInput.type = 'date'; endInput.id = 'reportEnd';
     const btn = document.createElement('button'); btn.className = 'btn primary'; btn.textContent = 'Buscar'; btn.id = 'reportSearchBtn';
     controls.appendChild(startLabel); controls.appendChild(startInput); controls.appendChild(endLabel); controls.appendChild(endInput); controls.appendChild(btn);
+    // debug: raw fetch button to inspect backend contents without date/station filtering
+    const rawBtn = document.createElement('button'); rawBtn.className = 'btn secondary'; rawBtn.textContent = 'Ver raw'; rawBtn.id = 'reportRawBtn'; rawBtn.style.marginLeft = '8px';
+    controls.appendChild(rawBtn);
     container.appendChild(controls);
 
     // table placeholder
@@ -352,6 +355,21 @@
         titleEl.textContent = 'Reporte General';
       }
       loadReport(startInput.value, endInput.value, stationFilter);
+    });
+
+    // Raw debug fetch — returns the full logs JSON and prints a small summary
+    rawBtn.addEventListener('click', async () => {
+      try {
+        const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+        const res = await fetch((base || '') + '/api/time/logs');
+        const wrap = document.getElementById('reportTableWrap');
+        if (!res.ok) { wrap.textContent = 'No se pudo obtener logs (raw)'; return; }
+        const data = await res.json();
+        const dbg = document.getElementById('reportDebug') || document.createElement('pre');
+        dbg.id = 'reportDebug'; dbg.style.maxHeight = '320px'; dbg.style.overflow = 'auto'; dbg.style.background = 'rgba(0,0,0,0.04)'; dbg.style.padding = '8px'; dbg.style.borderRadius = '6px'; dbg.style.marginTop = '8px';
+        try { dbg.textContent = `Count: ${Array.isArray(data) ? data.length : 1}\n` + JSON.stringify(data, null, 2); } catch(e){ dbg.textContent = String(data); }
+        wrap.parentNode.insertBefore(dbg, wrap.nextSibling);
+      } catch (e) { console.error('raw fetch failed', e); showToast && showToast('Error fetch raw logs', 3000, 'error'); }
     });
 
     // load stations in scroller
