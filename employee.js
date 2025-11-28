@@ -258,7 +258,7 @@
         }
       } catch(e){}
       if (finishBtn) { finishBtn.style.display = ''; }
-      if (changeBtn) { changeBtn.style.display = ''; changeBtn.textContent = 'Otra ronda'; }
+      if (changeBtn) { changeBtn.style.display = 'none'; }
       // hide start until finalized or stopped
       startBtn.style.display = 'none';
       saveStateToStorage();
@@ -304,7 +304,7 @@
         // hide start completely while in completed state
         if (startBtn) startBtn.style.display = 'none';
         if (stopBtn) stopBtn.style.display = 'none';
-        if (changeBtn) { changeBtn.style.display = ''; changeBtn.textContent = 'Otra ronda'; }
+        if (changeBtn) { changeBtn.style.display = 'none'; }
         if (finishBtn) finishBtn.style.display = '';
         return;
       }
