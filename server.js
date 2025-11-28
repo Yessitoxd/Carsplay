@@ -212,20 +212,17 @@ app.post('/api/time/logs', async (req, res) => {
 app.get('/api/time/logs', async (req, res) => {
   try {
     const q = req.query || {};
+    // If the client provides explicit ISO instants for start/end, trust them exactly.
+    // Otherwise default to the server's current local day (start at 00:00, end at 23:59:59.999).
     let startDate = q.start ? new Date(q.start) : null;
     let endDate = q.end ? new Date(q.end) : null;
     if (!startDate) {
-      // default to today
       const now = new Date();
       startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0,0,0,0);
-    } else {
-      startDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0,0,0,0);
     }
     if (!endDate) {
       const now = new Date();
       endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23,59,59,999);
-    } else {
-      endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23,59,59,999);
     }
     const isDbConnected = mongoose && mongoose.connection && mongoose.connection.readyState === 1;
     if (!isDbConnected){
