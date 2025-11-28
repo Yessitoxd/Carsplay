@@ -37,7 +37,10 @@
         // thumbnail
         const img = document.createElement('img');
         img.alt = s.name || 'Carrito';
-        if (s.image) img.src = s.image; else img.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"></svg>';
+        // resolve image URL so that root-relative paths (/api/...) are requested from the API host
+        let imgSrc = s.image || '';
+        try { if (imgSrc && imgSrc.startsWith('/') && window.API_BASE) imgSrc = window.API_BASE.replace(/\/$/, '') + imgSrc; } catch(e){}
+        if (imgSrc) img.src = imgSrc; else img.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"></svg>';
         div.appendChild(img);
         // title
         const title = document.createElement('div'); title.style.flex = '1'; title.textContent = `${s.name || 'Carrito'} #${s.number || '-'}`;
@@ -73,7 +76,11 @@
     const modal = document.getElementById('editModal');
     const wrap = document.getElementById('editImageWrap');
     wrap.innerHTML = '';
-    const img = document.createElement('img'); img.src = station.image || ''; img.style.width = '100%'; img.style.borderRadius = '6px';
+    const img = document.createElement('img');
+    let editImgSrc = station.image || '';
+    try { if (editImgSrc && editImgSrc.startsWith('/') && window.API_BASE) editImgSrc = window.API_BASE.replace(/\/$/, '') + editImgSrc; } catch(e){}
+    img.src = editImgSrc || '';
+    img.style.width = '100%'; img.style.borderRadius = '6px';
     wrap.appendChild(img);
     document.getElementById('editNumber').value = station.number || '';
     modal.style.display = '';

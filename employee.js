@@ -94,8 +94,13 @@
     div.className = 'card';
     div.dataset.id = id;
     // Render thumbnail image if available, otherwise show placeholder text
-    const thumbHtml = station.image
-      ? `<div class="img"><img src="${station.image}" alt="${station.name || 'Carrito'}" style="width:100%;height:100%;object-fit:cover;border-radius:6px"/></div>`
+    // resolve image URL: if stored as a root-relative path (/api/...), prefix with API_BASE
+    let imageSrc = station.image || '';
+    try {
+      if (imageSrc && imageSrc.startsWith('/') && window.API_BASE) imageSrc = window.API_BASE.replace(/\/$/, '') + imageSrc;
+    } catch(e){}
+    const thumbHtml = imageSrc
+      ? `<div class="img"><img src="${imageSrc}" alt="${station.name || 'Carrito'}" style="width:100%;height:100%;object-fit:cover;border-radius:6px"/></div>`
       : `<div class="img">Imagen</div>`;
 
     // build duration select based on TIME_RATES (fallback to static options)
