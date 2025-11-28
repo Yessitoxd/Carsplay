@@ -1,5 +1,10 @@
 // employee.js - per-station timers, progress bar, start/reset controls
 (function(){
+  // Ensure a sensible API base in case the HTML did not inject `window.API_BASE` (e.g. stale deploy)
+  if (!window.API_BASE) {
+    window.API_BASE = 'https://carsplay.onrender.com';
+    console.info('employee.js: window.API_BASE not found — defaulting to', window.API_BASE);
+  }
   const pad = (n) => String(n).padStart(2,'0');
   const fmt = (s) => {
     const hrs = Math.floor(s/3600); const mins = Math.floor((s%3600)/60); const secs = s%60;
@@ -567,7 +572,10 @@
   async function loadStations(){
     let stations = null;
     try {
-      const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+      // determine API base: prefer explicit `window.API_BASE`; when opened from file:// use localhost:3000
+      const base = (window.API_BASE && String(window.API_BASE).replace(/\/$/, ''))
+                   || ((window.location && window.location.protocol === 'file:') ? 'http://localhost:3000' : '');
+      console.info('Using API base for requests:', base || '(same origin)');
       // fetch time rates first (optional)
       try {
         const tr = await fetch((base || '') + '/api/time/rates');

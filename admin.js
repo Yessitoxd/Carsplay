@@ -2,6 +2,12 @@
 (function(){
   const USER_KEY = 'carsplay_user';
 
+  // Ensure a sensible API base in case the HTML did not inject `window.API_BASE` (e.g. stale deploy)
+  if (!window.API_BASE) {
+    window.API_BASE = 'https://carsplay.onrender.com';
+    console.info('admin.js: window.API_BASE not found — defaulting to', window.API_BASE);
+  }
+
   function getUser(){
     try { return JSON.parse(localStorage.getItem(USER_KEY)); } catch(e){ return null; }
   }
