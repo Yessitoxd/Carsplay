@@ -412,6 +412,19 @@ app.get('/api/ping', (req, res) => {
   }
 });
 
+// Health endpoint for uptime monitors (UptimeRobot, etc.)
+// Returns simple JSON and HTTP 200 when service is up. Includes DB connection state.
+app.get('/health', (req, res) => {
+  try {
+    const dbState = (mongoose && mongoose.connection) ? mongoose.connection.readyState : 0;
+    // mongoose readyState: 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
+    const dbConnected = dbState === 1;
+    return res.status(200).json({ ok: true, time: new Date().toISOString(), dbConnected, dbState });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: 'health_check_failed' });
+  }
+});
+
 // Generate XLSX report using template 'Reporte Plantilla.xlsx'
 app.get('/api/time/report.xlsx', async (req, res) => {
   try {
