@@ -581,8 +581,8 @@ app.get('/api/time/report.xlsx', async (req, res) => {
     if (totalMins < 60) totTimeLabel = `${totalMins} m`; else { const h = Math.floor(totalMins/60); const m = totalMins%60; totTimeLabel = `${h} h` + (m ? ` ${m} m` : ''); }
     try { ws.getCell('H7').value = totTimeLabel; ws.getCell('H7').font = { bold: true }; } catch(e){}
 
-    // Also write the report title into F4 and H4 to be robust if template uses either cell
-    try { ws.getCell('F4').value = title; ws.getCell('F4').font = { bold: true }; } catch(e){}
+    // Ensure F4 contains the literal label and H4 contains the computed title (date or range)
+    try { ws.getCell('F4').value = 'Reporte del día'; ws.getCell('F4').font = { bold: true }; } catch(e){}
     try { ws.getCell('H4').value = title; ws.getCell('H4').font = { bold: true }; } catch(e){}
 
     // send workbook as attachment
