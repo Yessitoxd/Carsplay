@@ -331,7 +331,8 @@
 
     // set defaults to today
     const now = new Date();
-    const iso = now.toISOString().slice(0,10);
+    const pad = (n) => String(n).padStart(2,'0');
+    const iso = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
     startInput.value = iso; endInput.value = iso;
 
     btn.addEventListener('click', () => {

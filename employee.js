@@ -301,10 +301,23 @@
           comment: sess.comment || (sess.settled ? 'Finalizado' : null)
         };
         const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+        console.info('Posting session log to', (base || '') + '/api/time/logs', payload);
         const res = await fetch((base || '') + '/api/time/logs', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
         });
-        if (res.ok){ sess._logged = true; saveStateToStorage(); }
+        if (res.ok){
+          sess._logged = true; saveStateToStorage();
+          console.info('Session log posted', payload);
+        } else {
+          console.warn('Session log post failed status', res.status);
+          // try once more after short delay
+          setTimeout(async () => {
+            try {
+              const retry = await fetch((base || '') + '/api/time/logs', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(payload) });
+              if (retry.ok){ sess._logged = true; saveStateToStorage(); console.info('Session log retry success'); }
+            } catch(e){ console.warn('Session log retry failed', e); }
+          }, 1500);
+        }
       } catch(e){ console.warn('postSessionLog failed', e); }
     }
 
@@ -443,6 +456,8 @@
             // charge full originally selected total as requested
             sess.amount = sess.amount !== undefined && sess.amount !== null ? sess.amount : (s.plannedAmount || Math.round((s.total/60) * 1));
             sess.settled = true;
+            // mark as stopped early
+            sess.comment = sess.comment || 'Detenido antes de tiempo';
             // persist this settled session to server
             postSessionLog(sess);
           }
@@ -554,6 +569,8 @@
             if (sess && sess.end && !sess.settled){
               sess.settled = true;
               sess.amount = sess.amount !== undefined && sess.amount !== null ? sess.amount : (sess.amount = (s.plannedAmount || Math.round((s.total/60) * 1)) );
+              // mark finalized comment
+              sess.comment = sess.comment || 'Finalizado con exito';
               // persist each finalized session
               postSessionLog(sess);
             }
