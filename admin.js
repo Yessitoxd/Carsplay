@@ -9,8 +9,8 @@
   function requireAdmin(){
     const u = getUser();
     if (!u || (u.role || '').toLowerCase() !== 'admin') {
-      // redirect to admin login
-      window.location.href = (window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '') + '/admin_login.html';
+      // redirect to admin login (frontend)
+      window.location.href = '/admin_login.html';
       return false;
     }
     return true;
@@ -398,7 +398,8 @@
     document.getElementById('sidebarLogout').addEventListener('click', () => {
       localStorage.removeItem(USER_KEY);
       localStorage.removeItem('carsplay_token');
-      window.location.href = (window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '') + '/admin_login.html';
+      // navigate back to admin login on the frontend (same origin)
+      window.location.href = '/admin_login.html';
     });
     const downloadBtn = document.getElementById('downloadReport');
     if (downloadBtn) downloadBtn.addEventListener('click', downloadReport);

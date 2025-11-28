@@ -32,7 +32,8 @@
         // store user info and token for authenticated admin requests
         localStorage.setItem('carsplay_user', JSON.stringify({ username: data.username, role: data.role }));
         if (data.token) localStorage.setItem('carsplay_token', data.token);
-        window.location.href = (base || '') + '/admin.html';
+        // navigate to frontend admin page (same origin)
+        window.location.href = '/admin.html';
         return;
       }
 

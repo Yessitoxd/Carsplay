@@ -39,11 +39,12 @@
         // Redirect based on role returned by server
         const role = (data.role || '').toLowerCase();
         if (role === 'employee' || role === 'empleado') {
-          window.location.href = (base || '') + '/employee.html';
+          // Always navigate to the frontend's employee page (same origin)
+          window.location.href = '/employee.html';
           return;
         }
-        // default to admin dashboard
-        window.location.href = (base || '') + '/dashboard.html';
+        // default to admin dashboard (frontend)
+        window.location.href = '/dashboard.html';
         return;
       }
 
