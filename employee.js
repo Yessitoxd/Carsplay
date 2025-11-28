@@ -294,7 +294,14 @@
         if (!sess.clientId) sess.clientId = genClientId();
         const userRaw = localStorage.getItem(USER_KEY);
         let username = null;
-        try { const u = userRaw ? JSON.parse(userRaw) : null; username = u && u.username ? u.username : null; } catch(e){}
+        try {
+          const u = userRaw ? JSON.parse(userRaw) : null;
+          // Avoid sending admin usernames in employee session logs. Only include username when role is not admin.
+          if (u && u.username) {
+            const role = (u.role || '').toString().toLowerCase();
+            username = role === 'admin' ? null : u.username;
+          }
+        } catch(e){}
         const stationNumber = card.dataset && card.dataset.stationNumber ? Number(card.dataset.stationNumber) : undefined;
         const stationName = card.dataset && card.dataset.stationName ? card.dataset.stationName : null;
         const payload = {

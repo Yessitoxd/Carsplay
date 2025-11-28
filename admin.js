@@ -421,9 +421,19 @@
     try {
       const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
       const q = [];
-      // Send explicit UTC range to avoid client/server timezone mismatches.
-      if (start) q.push('start=' + encodeURIComponent(start + 'T00:00:00Z'));
-      if (end) q.push('end=' + encodeURIComponent(end + 'T23:59:59Z'));
+      // Build UTC range from the local date selected by the user.
+      // Interpret the `start`/`end` strings as local dates (YYYY-MM-DD), then convert
+      // to UTC instants so server filters by UTC time correctly while matching the
+      // user's local-day selection.
+      if (start) {
+        const sLocal = new Date(start + 'T00:00:00');
+        q.push('start=' + encodeURIComponent(new Date(sLocal.getTime()).toISOString()));
+      }
+      if (end) {
+        // set to end of day local time
+        const eLocal = new Date(end + 'T23:59:59');
+        q.push('end=' + encodeURIComponent(new Date(eLocal.getTime()).toISOString()));
+      }
       const url = (base || '') + '/api/time/logs' + (q.length ? ('?' + q.join('&')) : '');
       const res = await fetch(url);
       const wrap = document.getElementById('reportTableWrap'); wrap.innerHTML = '';
@@ -436,7 +446,7 @@
       }
       // Build table
       const table = document.createElement('table'); table.className = 'report-table'; table.style.width = '100%'; table.style.borderCollapse = 'collapse';
-      const thead = document.createElement('thead'); const hrow = document.createElement('tr'); ['Fecha','Empleado','Consola','Dinero generado','Tiempo','Inicio','Fin','Comentario'].forEach(h => { const th = document.createElement('th'); th.textContent = h; th.style.textAlign='left'; th.style.padding='8px'; th.style.borderBottom='1px solid rgba(255,255,255,0.06)'; hrow.appendChild(th); }); thead.appendChild(hrow); table.appendChild(thead);
+      const thead = document.createElement('thead'); const hrow = document.createElement('tr'); ['Fecha','Empleado','Estación','Dinero generado','Tiempo','Inicio','Fin','Comentario'].forEach(h => { const th = document.createElement('th'); th.textContent = h; th.style.textAlign='left'; th.style.padding='8px'; th.style.borderBottom='1px solid rgba(255,255,255,0.06)'; hrow.appendChild(th); }); thead.appendChild(hrow); table.appendChild(thead);
       const tbody = document.createElement('tbody');
       let totalsCount = 0; let totalsAmount = 0; let totalsSeconds = 0;
       filtered.forEach(r => {
@@ -453,13 +463,34 @@
         tbody.appendChild(tr);
         totalsCount += 1; totalsAmount += Number(r.amount)||0; totalsSeconds += duration;
       });
+      // add tbody and table
       table.appendChild(tbody);
+      // add tfoot with aligned totals under Estación / Dinero generado / Tiempo
+      const tfoot = document.createElement('tfoot');
+      const frow = document.createElement('tr');
+      // Fecha, Empleado -> empty
+      for (let i=0;i<2;i++){ const td = document.createElement('td'); td.textContent = ''; td.style.padding='8px'; frow.appendChild(td); }
+      // Estación -> total count
+      const tdCount = document.createElement('td'); tdCount.textContent = `${totalsCount} vueltas`; tdCount.style.padding='8px'; tdCount.style.fontWeight='600'; frow.appendChild(tdCount);
+      // Dinero generado -> total amount
+      const tdAmount = document.createElement('td'); tdAmount.textContent = `C$ ${totalsAmount}`; tdAmount.style.padding='8px'; tdAmount.style.fontWeight='600'; frow.appendChild(tdAmount);
+      // Tiempo -> formatted total time per rule
+      const tdTime = document.createElement('td'); tdTime.style.padding='8px'; tdTime.style.fontWeight='600';
+      // format total seconds into minutes or "X h Y m"
+      const totalMins = Math.floor(totalsSeconds/60);
+      let timeLabel = '';
+      if (totalMins < 60) {
+        timeLabel = `${totalMins} m`;
+      } else {
+        const h = Math.floor(totalMins/60); const m = totalMins % 60;
+        timeLabel = `${h} h` + (m ? ` ${m} m` : '');
+      }
+      tdTime.textContent = timeLabel; frow.appendChild(tdTime);
+      // Inicio, Fin, Comentario -> empty cells
+      for (let i=0;i<3;i++){ const td = document.createElement('td'); td.textContent = ''; td.style.padding='8px'; frow.appendChild(td); }
+      tfoot.appendChild(frow);
+      table.appendChild(tfoot);
       wrap.appendChild(table);
-      // totals row
-      const totalsDiv = document.createElement('div'); totalsDiv.style.marginTop = '8px'; totalsDiv.style.fontWeight='600';
-      const totTimeH = Math.floor(totalsSeconds/3600); const totTimeM = Math.floor((totalsSeconds%3600)/60);
-      totalsDiv.textContent = `Totales — ${totalsCount} vueltas  |  C$ ${totalsAmount}  |  ${totTimeH ? totTimeH + ' h ' + totTimeM + ' m' : totTimeM + ' m'}`;
-      wrap.appendChild(totalsDiv);
     } catch(e){ console.error('loadReport failed', e); const wrap = document.getElementById('reportTableWrap'); if (wrap) wrap.textContent = 'Error cargando reporte'; }
   }
 
