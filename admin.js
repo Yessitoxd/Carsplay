@@ -346,13 +346,27 @@
         if (!res.ok) return;
         const stations = await res.json();
         const swrap = document.getElementById('stationsScroll'); swrap.innerHTML = '';
+        // allow selecting one station to filter report; clicking again clears selection
         stations.forEach(s => {
-          const c = document.createElement('div'); c.className = 'station-card small'; c.style.minWidth = '200px'; c.style.padding = '12px'; c.style.border = '2px solid #6ee'; c.style.borderRadius = '12px'; c.style.textAlign = 'center';
+          const c = document.createElement('div'); c.className = 'station-card small'; c.style.minWidth = '200px'; c.style.padding = '12px'; c.style.borderRadius = '12px'; c.style.textAlign = 'center'; c.style.cursor='pointer';
+          c.dataset.stationId = s._id || '';
+          c.dataset.stationNumber = s.number !== undefined ? String(s.number) : '';
           const img = document.createElement('img'); let imgSrc = s.image || ''; try{ if (imgSrc && imgSrc.startsWith('/') && window.API_BASE) imgSrc = window.API_BASE.replace(/\/$/, '') + imgSrc; }catch(e){}
           img.src = imgSrc || '';
           img.style.width = '80px'; img.style.height = '80px'; img.style.objectFit = 'contain'; img.style.display = 'block'; img.style.margin = '0 auto 8px';
           const title = document.createElement('div'); title.textContent = `${s.name || 'Carrito'} #${s.number || '-'}`; title.style.fontWeight = '600';
           c.appendChild(img); c.appendChild(title); swrap.appendChild(c);
+          c.addEventListener('click', () => {
+            // toggle selection
+            const prev = document.querySelector('.station-card.small.selected');
+            if (prev && prev !== c) prev.classList.remove('selected');
+            const isSelected = c.classList.toggle('selected');
+            const stationFilter = isSelected ? (c.dataset.stationId || c.dataset.stationNumber) : null;
+            // load report for current date inputs and station filter
+            const sVal = document.getElementById('reportStart').value;
+            const eVal = document.getElementById('reportEnd').value;
+            loadReport(sVal, eVal, stationFilter);
+          });
         });
       } catch(e){ console.warn('stations scroller failed', e); }
     })();
@@ -361,7 +375,7 @@
     loadReport(iso, iso);
   }
 
-  async function loadReport(start, end){
+  async function loadReport(start, end, stationFilter){
     try {
       const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
       const q = [];
@@ -372,12 +386,17 @@
       const wrap = document.getElementById('reportTableWrap'); wrap.innerHTML = '';
       if (!res.ok) { wrap.textContent = 'No se pudo cargar el reporte'; return; }
       const data = await res.json();
+      // if stationFilter present, filter client-side by stationId or stationNumber
+      let filtered = data;
+      if (stationFilter) {
+        filtered = data.filter(r => (r.stationId && r.stationId === stationFilter) || (r.stationNumber && String(r.stationNumber) === String(stationFilter)) );
+      }
       // Build table
       const table = document.createElement('table'); table.className = 'report-table'; table.style.width = '100%'; table.style.borderCollapse = 'collapse';
       const thead = document.createElement('thead'); const hrow = document.createElement('tr'); ['Fecha','Empleado','Consola','Dinero generado','Tiempo','Inicio','Fin','Comentario'].forEach(h => { const th = document.createElement('th'); th.textContent = h; th.style.textAlign='left'; th.style.padding='8px'; th.style.borderBottom='1px solid rgba(255,255,255,0.06)'; hrow.appendChild(th); }); thead.appendChild(hrow); table.appendChild(thead);
       const tbody = document.createElement('tbody');
       let totalsCount = 0; let totalsAmount = 0; let totalsSeconds = 0;
-      data.forEach(r => {
+      filtered.forEach(r => {
         const tr = document.createElement('tr');
         const d = new Date(r.start);
         const dateStr = d.toLocaleDateString();

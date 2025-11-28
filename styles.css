@@ -183,6 +183,25 @@ body.admin-auth .card{border-radius:12px}
 .admin-section input[type="number"], .admin-section input[type="text"], .admin-section select, .admin-section .time-form input {
   padding: 12px 14px; border-radius: 12px; border: 1px solid #e6e9ee; font-size: 15px; background: #fff;
 }
+
+/* Report date pickers styling */
+.report-controls input[type="date"]{
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid rgba(107,70,255,0.16);
+  background:linear-gradient(180deg,#fff,#fbfbff);
+  color:#111827;
+  font-weight:600;
+}
+.report-controls input[type="date"]:focus{
+  outline:none; box-shadow:0 0 0 6px rgba(107,70,255,0.06);
+}
+
+/* Station scroller card selectable state */
+.station-card.small{background:linear-gradient(180deg,#2b2a4a,#2b2540); color:#e6f9ff}
+.station-card.small{border:2px solid rgba(110,238,255,0.4)}
+.station-card.small.selected{box-shadow:0 6px 20px rgba(107,70,255,0.18); border-color:#6be8ff}
+.station-card.small div{color:inherit}
 .admin-section .time-form label{font-weight:600; margin-right:6px}
 .admin-section .modal-card{border-radius:14px}
 .modal-card input{padding:10px; border-radius:8px}
