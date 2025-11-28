@@ -310,6 +310,97 @@
     } catch (e){ console.error(e); }
   }
 
+  // --- Reporting UI and data ---
+  function renderReportUI(){
+    const container = document.getElementById('reportContent');
+    container.innerHTML = '';
+    // top: horizontal station scroller
+    const stationsWrap = document.createElement('div'); stationsWrap.id = 'stationsScroll'; stationsWrap.style.display = 'flex'; stationsWrap.style.gap = '12px'; stationsWrap.style.overflowX = 'auto'; stationsWrap.style.padding = '8px 4px'; stationsWrap.style.marginBottom = '12px';
+    container.appendChild(stationsWrap);
+
+    // date range controls
+    const controls = document.createElement('div'); controls.className = 'report-controls'; controls.style.display = 'flex'; controls.style.gap = '12px'; controls.style.alignItems = 'center'; controls.style.marginBottom = '12px';
+    const startLabel = document.createElement('label'); startLabel.textContent = 'Fecha inicio:'; const startInput = document.createElement('input'); startInput.type = 'date'; startInput.id = 'reportStart';
+    const endLabel = document.createElement('label'); endLabel.textContent = 'Fecha fin:'; const endInput = document.createElement('input'); endInput.type = 'date'; endInput.id = 'reportEnd';
+    const btn = document.createElement('button'); btn.className = 'btn primary'; btn.textContent = 'Buscar'; btn.id = 'reportSearchBtn';
+    controls.appendChild(startLabel); controls.appendChild(startInput); controls.appendChild(endLabel); controls.appendChild(endInput); controls.appendChild(btn);
+    container.appendChild(controls);
+
+    // table placeholder
+    const tableWrap = document.createElement('div'); tableWrap.id = 'reportTableWrap'; tableWrap.style.marginTop = '8px'; container.appendChild(tableWrap);
+
+    // set defaults to today
+    const now = new Date();
+    const iso = now.toISOString().slice(0,10);
+    startInput.value = iso; endInput.value = iso;
+
+    btn.addEventListener('click', () => {
+      loadReport(startInput.value, endInput.value);
+    });
+
+    // load stations in scroller
+    (async function(){
+      try {
+        const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+        const res = await fetch((base || '') + '/api/stations');
+        if (!res.ok) return;
+        const stations = await res.json();
+        const swrap = document.getElementById('stationsScroll'); swrap.innerHTML = '';
+        stations.forEach(s => {
+          const c = document.createElement('div'); c.className = 'station-card small'; c.style.minWidth = '200px'; c.style.padding = '12px'; c.style.border = '2px solid #6ee'; c.style.borderRadius = '12px'; c.style.textAlign = 'center';
+          const img = document.createElement('img'); let imgSrc = s.image || ''; try{ if (imgSrc && imgSrc.startsWith('/') && window.API_BASE) imgSrc = window.API_BASE.replace(/\/$/, '') + imgSrc; }catch(e){}
+          img.src = imgSrc || '';
+          img.style.width = '80px'; img.style.height = '80px'; img.style.objectFit = 'contain'; img.style.display = 'block'; img.style.margin = '0 auto 8px';
+          const title = document.createElement('div'); title.textContent = `${s.name || 'Carrito'} #${s.number || '-'}`; title.style.fontWeight = '600';
+          c.appendChild(img); c.appendChild(title); swrap.appendChild(c);
+        });
+      } catch(e){ console.warn('stations scroller failed', e); }
+    })();
+
+    // initial load
+    loadReport(iso, iso);
+  }
+
+  async function loadReport(start, end){
+    try {
+      const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+      const q = [];
+      if (start) q.push('start=' + encodeURIComponent(start));
+      if (end) q.push('end=' + encodeURIComponent(end));
+      const url = (base || '') + '/api/time/logs' + (q.length ? ('?' + q.join('&')) : '');
+      const res = await fetch(url);
+      const wrap = document.getElementById('reportTableWrap'); wrap.innerHTML = '';
+      if (!res.ok) { wrap.textContent = 'No se pudo cargar el reporte'; return; }
+      const data = await res.json();
+      // Build table
+      const table = document.createElement('table'); table.className = 'report-table'; table.style.width = '100%'; table.style.borderCollapse = 'collapse';
+      const thead = document.createElement('thead'); const hrow = document.createElement('tr'); ['Fecha','Empleado','Consola','Dinero generado','Tiempo','Inicio','Fin','Comentario'].forEach(h => { const th = document.createElement('th'); th.textContent = h; th.style.textAlign='left'; th.style.padding='8px'; th.style.borderBottom='1px solid rgba(255,255,255,0.06)'; hrow.appendChild(th); }); thead.appendChild(hrow); table.appendChild(thead);
+      const tbody = document.createElement('tbody');
+      let totalsCount = 0; let totalsAmount = 0; let totalsSeconds = 0;
+      data.forEach(r => {
+        const tr = document.createElement('tr');
+        const d = new Date(r.start);
+        const dateStr = d.toLocaleDateString();
+        const startTime = new Date(r.start).toLocaleTimeString();
+        const endTime = new Date(r.end).toLocaleTimeString();
+        const duration = r.duration || Math.max(0, Math.floor((new Date(r.end).getTime() - new Date(r.start).getTime())/1000));
+        const hrs = Math.floor(duration/3600); const mins = Math.floor((duration%3600)/60);
+        const timeStr = hrs ? `${hrs} h ${mins} m` : `${mins} m`;
+        const cells = [dateStr, (r.username||''), (r.stationName ? (r.stationName + (r.stationNumber ? ' #' + r.stationNumber : '')) : (r.stationNumber ? ('#'+r.stationNumber) : '')), ('C$ ' + (Number(r.amount)||0)), timeStr, startTime, endTime, (r.comment||'')];
+        cells.forEach(c => { const td = document.createElement('td'); td.textContent = c; td.style.padding='8px'; td.style.borderBottom='1px solid rgba(255,255,255,0.03)'; tr.appendChild(td); });
+        tbody.appendChild(tr);
+        totalsCount += 1; totalsAmount += Number(r.amount)||0; totalsSeconds += duration;
+      });
+      table.appendChild(tbody);
+      wrap.appendChild(table);
+      // totals row
+      const totalsDiv = document.createElement('div'); totalsDiv.style.marginTop = '8px'; totalsDiv.style.fontWeight='600';
+      const totTimeH = Math.floor(totalsSeconds/3600); const totTimeM = Math.floor((totalsSeconds%3600)/60);
+      totalsDiv.textContent = `Totales — ${totalsCount} vueltas  |  C$ ${totalsAmount}  |  ${totTimeH ? totTimeH + ' h ' + totTimeM + ' m' : totTimeM + ' m'}`;
+      wrap.appendChild(totalsDiv);
+    } catch(e){ console.error('loadReport failed', e); const wrap = document.getElementById('reportTableWrap'); if (wrap) wrap.textContent = 'Error cargando reporte'; }
+  }
+
   async function createTimeRate(ev){
     ev.preventDefault();
     const minsEl = document.getElementById('tr-minutes');
@@ -557,6 +648,8 @@
     setupSidebar();
     // show default section
     showSection('report');
+    // render report UI and load today's report
+    try { renderReportUI(); } catch(e){ console.warn('renderReportUI failed', e); }
   });
 
 })();

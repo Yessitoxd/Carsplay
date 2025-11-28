@@ -93,6 +93,9 @@
     const div = document.createElement('div');
     div.className = 'card';
     div.dataset.id = id;
+    // expose station metadata for logging
+    try { if (station.number !== undefined) div.dataset.stationNumber = String(station.number); } catch(e){}
+    try { if (station.name) div.dataset.stationName = station.name; } catch(e){}
     // Render thumbnail image if available, otherwise show placeholder text
     // resolve image URL: if stored as a root-relative path (/api/...), prefix with API_BASE
     let imageSrc = station.image || '';
@@ -277,6 +280,34 @@
       refreshControls();
     }
 
+    // Post a settled session to the backend for persistent reporting
+    async function postSessionLog(sess){
+      try {
+        if (!sess || !sess.end || sess._logged) return;
+        const userRaw = localStorage.getItem(USER_KEY);
+        let username = null;
+        try { const u = userRaw ? JSON.parse(userRaw) : null; username = u && u.username ? u.username : null; } catch(e){}
+        const stationNumber = card.dataset && card.dataset.stationNumber ? Number(card.dataset.stationNumber) : undefined;
+        const stationName = card.dataset && card.dataset.stationName ? card.dataset.stationName : null;
+        const payload = {
+          stationId: card.dataset.id || null,
+          stationNumber,
+          stationName,
+          username,
+          start: sess.start ? new Date(sess.start).toISOString() : null,
+          end: sess.end ? new Date(sess.end).toISOString() : null,
+          duration: sess.duration !== undefined ? Number(sess.duration) : (sess.accumulated || 0),
+          amount: sess.amount !== undefined ? Number(sess.amount) : (s.plannedAmount || 0),
+          comment: sess.comment || (sess.settled ? 'Finalizado' : null)
+        };
+        const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+        const res = await fetch((base || '') + '/api/time/logs', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        });
+        if (res.ok){ sess._logged = true; saveStateToStorage(); }
+      } catch(e){ console.warn('postSessionLog failed', e); }
+    }
+
     function tick(){
       const elapsed = getElapsed();
       if (s.total > 0 && elapsed >= s.total){ finishTimer(); return; }
@@ -412,6 +443,8 @@
             // charge full originally selected total as requested
             sess.amount = sess.amount !== undefined && sess.amount !== null ? sess.amount : (s.plannedAmount || Math.round((s.total/60) * 1));
             sess.settled = true;
+            // persist this settled session to server
+            postSessionLog(sess);
           }
         }
         s.startedAt = null; s.running = false;
@@ -487,7 +520,16 @@
         // transfer session data: move sessions array and running state
         state[targetId] = state[targetId] || { running:false, startedAt:null, accumulated:0, total:0, amount:0, timer:null, sessions:[], currentSession:null };
         // move current sessions to target
-        state[targetId].sessions = (state[targetId].sessions || []).concat(s.sessions || []);
+        // annotate moved sessions to indicate transfer from source to target (only show in target report)
+        const moved = (s.sessions || []).map(sess => {
+          try { const srcNum = Number(sourceId && STATION_BY_NUMBER ? (STATION_BY_NUMBER[sourceId] && STATION_BY_NUMBER[sourceId].number) : null); } catch(e){}
+          // prefer using readable station numbers from DOM datasets when possible
+          const srcNumVal = card && card.dataset && card.dataset.stationNumber ? card.dataset.stationNumber : null;
+          const destNumVal = targetCard && targetCard.dataset && targetCard.dataset.stationNumber ? targetCard.dataset.stationNumber : null;
+          if (sess) sess.comment = `Cambio de estación ${srcNumVal || sourceId} → ${destNumVal || targetId}`;
+          return sess;
+        });
+        state[targetId].sessions = (state[targetId].sessions || []).concat(moved);
         state[targetId].accumulated = s.accumulated;
         state[targetId].total = s.total;
         state[targetId].plannedAmount = s.plannedAmount;
@@ -512,6 +554,8 @@
             if (sess && sess.end && !sess.settled){
               sess.settled = true;
               sess.amount = sess.amount !== undefined && sess.amount !== null ? sess.amount : (sess.amount = (s.plannedAmount || Math.round((s.total/60) * 1)) );
+              // persist each finalized session
+              postSessionLog(sess);
             }
           });
         }

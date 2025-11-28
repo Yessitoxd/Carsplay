@@ -8,6 +8,7 @@ const { connect } = require('./db');
 const User = require('./models/user');
 const Station = require('./models/station');
 const TimeRate = require('./models/timeRate');
+const TimeLog = require('./models/timeLog');
 
 const app = express();
 const fs = require('fs');
@@ -129,6 +130,57 @@ app.post('/api/time/rates', verifyToken, requireAdmin, async (req, res) => {
     return res.status(201).json(r);
   } catch (err) {
     console.error('Create time rate error', err);
+    return res.status(500).json({ ok: false, error: 'server_error' });
+  }
+});
+
+// Persist a time session (log). Public POST so employees can send session records.
+app.post('/api/time/logs', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const start = body.start ? new Date(body.start) : null;
+    const end = body.end ? new Date(body.end) : null;
+    if (!start || !end) return res.status(400).json({ ok: false, error: 'missing_start_or_end' });
+    const duration = body.duration !== undefined ? Number(body.duration) : Math.max(0, Math.floor((end.getTime() - start.getTime())/1000));
+    const amount = body.amount !== undefined ? Number(body.amount) : 0;
+    const log = new TimeLog({
+      stationId: body.stationId || null,
+      stationNumber: body.stationNumber !== undefined ? Number(body.stationNumber) : undefined,
+      stationName: body.stationName || null,
+      username: body.username || null,
+      start, end, duration, amount, comment: body.comment || null
+    });
+    await log.save();
+    return res.status(201).json({ ok: true, id: log._id });
+  } catch (err) {
+    console.error('Create time log error', err);
+    return res.status(500).json({ ok: false, error: 'server_error' });
+  }
+});
+
+// Get time logs in a date range. Query params: start=YYYY-MM-DD, end=YYYY-MM-DD (inclusive)
+app.get('/api/time/logs', async (req, res) => {
+  try {
+    const q = req.query || {};
+    let startDate = q.start ? new Date(q.start) : null;
+    let endDate = q.end ? new Date(q.end) : null;
+    if (!startDate) {
+      // default to today
+      const now = new Date();
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0,0,0,0);
+    } else {
+      startDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0,0,0,0);
+    }
+    if (!endDate) {
+      const now = new Date();
+      endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23,59,59,999);
+    } else {
+      endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23,59,59,999);
+    }
+    const logs = await TimeLog.find({ start: { $gte: startDate, $lte: endDate } }).sort({ start: 1 }).exec();
+    return res.json(logs);
+  } catch (err) {
+    console.error('Fetch time logs error', err);
     return res.status(500).json({ ok: false, error: 'server_error' });
   }
 });
