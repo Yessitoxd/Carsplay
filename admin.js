@@ -319,6 +319,8 @@
     container.appendChild(stationsWrap);
 
     // date range controls
+    const titleDiv = document.createElement('div'); titleDiv.id = 'reportTitle'; titleDiv.style.fontWeight = '700'; titleDiv.style.marginBottom = '8px'; titleDiv.textContent = 'Reporte General';
+    container.appendChild(titleDiv);
     const controls = document.createElement('div'); controls.className = 'report-controls'; controls.style.display = 'flex'; controls.style.gap = '12px'; controls.style.alignItems = 'center'; controls.style.marginBottom = '12px';
     const startLabel = document.createElement('label'); startLabel.textContent = 'Fecha inicio:'; const startInput = document.createElement('input'); startInput.type = 'date'; startInput.id = 'reportStart';
     const endLabel = document.createElement('label'); endLabel.textContent = 'Fecha fin:'; const endInput = document.createElement('input'); endInput.type = 'date'; endInput.id = 'reportEnd';
@@ -336,6 +338,9 @@
     startInput.value = iso; endInput.value = iso;
 
     btn.addEventListener('click', () => {
+      // clear any selected station when user explicitly searches
+      const prev = document.querySelector('.station-card.small.selected'); if (prev) prev.classList.remove('selected');
+      document.getElementById('reportTitle').textContent = 'Reporte General';
       loadReport(startInput.value, endInput.value);
     });
 
@@ -363,6 +368,14 @@
             if (prev && prev !== c) prev.classList.remove('selected');
             const isSelected = c.classList.toggle('selected');
             const stationFilter = isSelected ? (c.dataset.stationId || c.dataset.stationNumber) : null;
+            // update title to show station number when selected
+            const titleEl = document.getElementById('reportTitle');
+            if (isSelected) {
+              const num = c.dataset.stationNumber || '';
+              titleEl.textContent = num ? `Reporte estación #${num}` : `Reporte estación`;
+            } else {
+              titleEl.textContent = 'Reporte General';
+            }
             // load report for current date inputs and station filter
             const sVal = document.getElementById('reportStart').value;
             const eVal = document.getElementById('reportEnd').value;

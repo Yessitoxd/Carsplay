@@ -310,15 +310,41 @@
           console.info('Session log posted', payload);
         } else {
           console.warn('Session log post failed status', res.status);
-          // try once more after short delay
-          setTimeout(async () => {
-            try {
-              const retry = await fetch((base || '') + '/api/time/logs', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(payload) });
-              if (retry.ok){ sess._logged = true; saveStateToStorage(); console.info('Session log retry success'); }
-            } catch(e){ console.warn('Session log retry failed', e); }
-          }, 1500);
+          enqueuePendingLog(payload);
         }
       } catch(e){ console.warn('postSessionLog failed', e); }
+    }
+
+    // Persist pending logs locally and retry later
+    function enqueuePendingLog(payload){
+      try {
+        const key = 'carsplay_pending_logs_v1';
+        const raw = localStorage.getItem(key);
+        const arr = raw ? JSON.parse(raw) : [];
+        arr.push({ payload, ts: Date.now() });
+        localStorage.setItem(key, JSON.stringify(arr));
+        showToast && showToast('Registro guardado localmente; se reintentará enviar.', 3500, 'warning');
+      } catch(e){ console.warn('enqueuePendingLog failed', e); }
+    }
+
+    async function flushPendingLogs(){
+      try {
+        const key = 'carsplay_pending_logs_v1';
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+        let arr = JSON.parse(raw) || [];
+        if (!Array.isArray(arr) || arr.length === 0) return;
+        const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+        const remaining = [];
+        for (const entry of arr){
+          try {
+            const res = await fetch((base || '') + '/api/time/logs', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(entry.payload) });
+            if (!res.ok){ remaining.push(entry); }
+          } catch(e){ remaining.push(entry); }
+        }
+        if (remaining.length > 0) localStorage.setItem(key, JSON.stringify(remaining)); else localStorage.removeItem(key);
+        if (remaining.length === 0) showToast && showToast('Registros pendientes sincronizados.', 3000, 'success');
+      } catch(e){ console.warn('flushPendingLogs failed', e); }
     }
 
     function tick(){
@@ -730,6 +756,8 @@
   document.addEventListener('DOMContentLoaded', () => {
     setupPanelAndUser();
     loadStations();
+    // Try to flush any pending logs that failed to send earlier
+    try { flushPendingLogs(); } catch(e){}
   });
 
 })();
