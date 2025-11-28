@@ -55,6 +55,20 @@
       }
       console.info('Using API base:', window.API_BASE);
   </script>
+  <script>
+    // Keep-alive ping (index/login page) — ping backend every 5 minutes
+    (function(){
+      try {
+        const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
+        if (!base) return;
+        const ping = async () => {
+          try { await fetch((base || '') + '/api/ping', { method: 'GET', cache: 'no-cache' }); } catch(e){}
+        };
+        setTimeout(ping, 1500);
+        setInterval(ping, 5 * 60 * 1000);
+      } catch(e){}
+    })();
+  </script>
   <script src="login.js"></script>
 </body>
 </html>

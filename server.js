@@ -403,6 +403,15 @@ app.get('/api/uploads/:id', async (req, res) => {
 
 app.get('/', (req, res) => res.json({ ok: true, message: 'CarsPlay Auth Service' }));
 
+// Lightweight ping endpoint for keep-alive / health checks
+app.get('/api/ping', (req, res) => {
+  try {
+    return res.json({ ok: true, time: new Date().toISOString() });
+  } catch (e) {
+    return res.status(500).json({ ok: false });
+  }
+});
+
 // Generate XLSX report using template 'Reporte Plantilla.xlsx'
 app.get('/api/time/report.xlsx', async (req, res) => {
   try {
