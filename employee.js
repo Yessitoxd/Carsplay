@@ -311,18 +311,18 @@
 
       if (!s.running && !s.currentSession){
         // idle
-        startBtn.textContent = 'Iniciar'; startBtn.disabled = false;
+        if (startBtn) { startBtn.style.display = ''; startBtn.textContent = 'Iniciar'; startBtn.disabled = false; }
         if (stopBtn) stopBtn.style.display = 'none';
         if (changeBtn) changeBtn.style.display = 'none';
         if (finishBtn) finishBtn.style.display = 'none';
       } else if (s.running){
-        startBtn.textContent = 'Pausar'; startBtn.disabled = false;
+        if (startBtn) { startBtn.style.display = ''; startBtn.textContent = 'Pausar'; startBtn.disabled = false; }
         if (stopBtn) stopBtn.style.display = '';
         if (changeBtn) changeBtn.style.display = '';
         if (finishBtn) finishBtn.style.display = 'none';
       } else if (!s.running && s.currentSession !== null){
         // paused (but not completed)
-        startBtn.textContent = 'Reanudar'; startBtn.disabled = false;
+        if (startBtn) { startBtn.style.display = ''; startBtn.textContent = 'Reanudar'; startBtn.disabled = false; }
         if (stopBtn) stopBtn.style.display = '';
         if (changeBtn) changeBtn.style.display = '';
         if (finishBtn) finishBtn.style.display = 'none';
