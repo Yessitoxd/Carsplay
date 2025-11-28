@@ -138,6 +138,13 @@
       </div>
     </section>
   </main>
+  <script>
+    // Default API base for deployed frontend (Netlify). Override by setting window.API_BASE in your site settings.
+    if (!window.API_BASE) {
+      window.API_BASE = 'https://carsplay.onrender.com';
+    }
+    console.info('Using API base:', window.API_BASE);
+  </script>
   <script src="admin.js"></script>
 </body>
 </html>
