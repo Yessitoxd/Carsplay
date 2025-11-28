@@ -280,16 +280,25 @@
       refreshControls();
     }
 
-    // Post a settled session to the backend for persistent reporting
+    // Client id generator for idempotency
+    function genClientId(){
+      try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch(e){}
+      return 'c-' + Date.now() + '-' + Math.floor(Math.random()*1000000);
+    }
+
+    // Post a settled session to the backend for persistent reporting (idempotent via clientId)
     async function postSessionLog(sess){
       try {
         if (!sess || !sess.end || sess._logged) return;
+        // ensure session has a clientId for idempotency
+        if (!sess.clientId) sess.clientId = genClientId();
         const userRaw = localStorage.getItem(USER_KEY);
         let username = null;
         try { const u = userRaw ? JSON.parse(userRaw) : null; username = u && u.username ? u.username : null; } catch(e){}
         const stationNumber = card.dataset && card.dataset.stationNumber ? Number(card.dataset.stationNumber) : undefined;
         const stationName = card.dataset && card.dataset.stationName ? card.dataset.stationName : null;
         const payload = {
+          clientId: sess.clientId,
           stationId: card.dataset.id || null,
           stationNumber,
           stationName,
@@ -302,50 +311,32 @@
         };
         const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
         console.info('Posting session log to', (base || '') + '/api/time/logs', payload);
-        const res = await fetch((base || '') + '/api/time/logs', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-        });
-        if (res.ok){
+
+        // attempt post with one retry; do NOT persist to localStorage per Option A
+        let ok = false;
+        for (let attempt = 1; attempt <= 2; attempt++){
+          try {
+            const res = await fetch((base || '') + '/api/time/logs', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            });
+            if (res.ok){ ok = true; break; }
+            console.warn('Session log post failed status', res.status);
+          } catch (e){ console.warn('Session log post attempt failed', e); }
+          // small delay before retry
+          if (attempt === 1) await new Promise(r => setTimeout(r, 800));
+        }
+
+        if (ok){
           sess._logged = true; saveStateToStorage();
           console.info('Session log posted', payload);
         } else {
-          console.warn('Session log post failed status', res.status);
-          enqueuePendingLog(payload);
+          console.warn('Session log could not be sent to server after retries');
+          showToast && showToast('No se pudo guardar el registro en el servidor. Intenta nuevamente.', 4500, 'warning');
         }
       } catch(e){ console.warn('postSessionLog failed', e); }
     }
 
-    // Persist pending logs locally and retry later
-    function enqueuePendingLog(payload){
-      try {
-        const key = 'carsplay_pending_logs_v1';
-        const raw = localStorage.getItem(key);
-        const arr = raw ? JSON.parse(raw) : [];
-        arr.push({ payload, ts: Date.now() });
-        localStorage.setItem(key, JSON.stringify(arr));
-        showToast && showToast('Registro guardado localmente; se reintentará enviar.', 3500, 'warning');
-      } catch(e){ console.warn('enqueuePendingLog failed', e); }
-    }
-
-    async function flushPendingLogs(){
-      try {
-        const key = 'carsplay_pending_logs_v1';
-        const raw = localStorage.getItem(key);
-        if (!raw) return;
-        let arr = JSON.parse(raw) || [];
-        if (!Array.isArray(arr) || arr.length === 0) return;
-        const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
-        const remaining = [];
-        for (const entry of arr){
-          try {
-            const res = await fetch((base || '') + '/api/time/logs', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(entry.payload) });
-            if (!res.ok){ remaining.push(entry); }
-          } catch(e){ remaining.push(entry); }
-        }
-        if (remaining.length > 0) localStorage.setItem(key, JSON.stringify(remaining)); else localStorage.removeItem(key);
-        if (remaining.length === 0) showToast && showToast('Registros pendientes sincronizados.', 3000, 'success');
-      } catch(e){ console.warn('flushPendingLogs failed', e); }
-    }
+    // (Removed persistent local pending-log queue per Option A: direct backend save only.)
 
     function tick(){
       const elapsed = getElapsed();
@@ -430,7 +421,7 @@
         if (!s.total) s.total = mins * 60;
         // start a new session record if none active
         if (s.currentSession === null) {
-          const sess = { start: Date.now(), minutes: mins, amount: (durationSel.selectedOptions && durationSel.selectedOptions[0] && durationSel.selectedOptions[0].dataset.amount) ? parseFloat(durationSel.selectedOptions[0].dataset.amount) : null, settled: false };
+          const sess = { clientId: genClientId(), start: Date.now(), minutes: mins, amount: (durationSel.selectedOptions && durationSel.selectedOptions[0] && durationSel.selectedOptions[0].dataset.amount) ? parseFloat(durationSel.selectedOptions[0].dataset.amount) : null, settled: false };
           s.sessions.push(sess);
           s.currentSession = s.sessions.length - 1;
         }
@@ -756,8 +747,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     setupPanelAndUser();
     loadStations();
-    // Try to flush any pending logs that failed to send earlier
-    try { flushPendingLogs(); } catch(e){}
+    // Pending-log queue removed: we post directly to server (Option A)
   });
 
 })();

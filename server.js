@@ -17,6 +17,9 @@ const mongoose = require('mongoose');
 app.use(cors());
 app.use(express.json());
 
+// In-memory fallback storage for TimeLogs when MongoDB is not available (development only)
+const IN_MEMORY_LOGS = [];
+
 // configure multer to use memory storage — we'll push files into GridFS
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -143,15 +146,62 @@ app.post('/api/time/logs', async (req, res) => {
     if (!start || !end) return res.status(400).json({ ok: false, error: 'missing_start_or_end' });
     const duration = body.duration !== undefined ? Number(body.duration) : Math.max(0, Math.floor((end.getTime() - start.getTime())/1000));
     const amount = body.amount !== undefined ? Number(body.amount) : 0;
+
+    // If MongoDB is not connected, persist logs in-memory for immediate local testing
+    const isDbConnected = mongoose && mongoose.connection && mongoose.connection.readyState === 1;
+    const clientId = body.clientId ? String(body.clientId) : null;
+    if (!isDbConnected) {
+      // check idempotency in memory
+      if (clientId) {
+        const ex = IN_MEMORY_LOGS.find(x => x.clientId === clientId);
+        if (ex) return res.json({ ok: true, id: ex.id, existing: true });
+      }
+      const rec = {
+        id: 'mem-' + Date.now() + '-' + Math.floor(Math.random()*1000000),
+        clientId: clientId || undefined,
+        stationId: body.stationId || null,
+        stationNumber: body.stationNumber !== undefined ? Number(body.stationNumber) : undefined,
+        stationName: body.stationName || null,
+        username: body.username || null,
+        start, end, duration, amount, comment: body.comment || null,
+        createdAt: new Date()
+      };
+      IN_MEMORY_LOGS.push(rec);
+      return res.status(201).json({ ok: true, id: rec.id, inMemory: true });
+    }
+
+    // DB connected: use mongoose model with idempotency
+    if (clientId) {
+      try {
+        const existing = await TimeLog.findOne({ clientId }).exec();
+        if (existing) return res.json({ ok: true, id: existing._id, existing: true });
+      } catch (e) {
+        // proceed to attempt insert below
+      }
+    }
+
     const log = new TimeLog({
+      clientId: clientId || undefined,
       stationId: body.stationId || null,
       stationNumber: body.stationNumber !== undefined ? Number(body.stationNumber) : undefined,
       stationName: body.stationName || null,
       username: body.username || null,
       start, end, duration, amount, comment: body.comment || null
     });
-    await log.save();
-    return res.status(201).json({ ok: true, id: log._id });
+    try {
+      await log.save();
+      return res.status(201).json({ ok: true, id: log._id });
+    } catch (saveErr) {
+      // handle duplicate key error (race where another request inserted same clientId)
+      if (saveErr && saveErr.code === 11000 && clientId) {
+        try {
+          const existing = await TimeLog.findOne({ clientId }).exec();
+          if (existing) return res.json({ ok: true, id: existing._id, existing: true });
+        } catch (e) { /* fall through */ }
+      }
+      console.error('Create time log save error', saveErr);
+      return res.status(500).json({ ok: false, error: 'server_error' });
+    }
   } catch (err) {
     console.error('Create time log error', err);
     return res.status(500).json({ ok: false, error: 'server_error' });
@@ -176,6 +226,15 @@ app.get('/api/time/logs', async (req, res) => {
       endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23,59,59,999);
     } else {
       endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23,59,59,999);
+    }
+    const isDbConnected = mongoose && mongoose.connection && mongoose.connection.readyState === 1;
+    if (!isDbConnected){
+      // return in-memory logs filtered by date range
+      const out = IN_MEMORY_LOGS.filter(l => {
+        const t = new Date(l.start).getTime();
+        return t >= startDate.getTime() && t <= endDate.getTime();
+      }).sort((a,b)=> new Date(a.start) - new Date(b.start));
+      return res.json(out);
     }
     const logs = await TimeLog.find({ start: { $gte: startDate, $lte: endDate } }).sort({ start: 1 }).exec();
     return res.json(logs);

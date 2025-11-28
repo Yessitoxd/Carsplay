@@ -338,10 +338,20 @@
     startInput.value = iso; endInput.value = iso;
 
     btn.addEventListener('click', () => {
-      // clear any selected station when user explicitly searches
-      const prev = document.querySelector('.station-card.small.selected'); if (prev) prev.classList.remove('selected');
-      document.getElementById('reportTitle').textContent = 'Reporte General';
-      loadReport(startInput.value, endInput.value);
+      // If a station is currently selected, keep it as the filter; otherwise show general report
+      const prev = document.querySelector('.station-card.small.selected');
+      let stationFilter = null;
+      if (prev) {
+        stationFilter = prev.dataset.stationId || prev.dataset.stationNumber || null;
+      }
+      const titleEl = document.getElementById('reportTitle');
+      if (stationFilter) {
+        const num = prev && prev.dataset ? (prev.dataset.stationNumber || '') : '';
+        titleEl.textContent = num ? `Reporte estación #${num}` : `Reporte estación`;
+      } else {
+        titleEl.textContent = 'Reporte General';
+      }
+      loadReport(startInput.value, endInput.value, stationFilter);
     });
 
     // load stations in scroller
@@ -393,8 +403,9 @@
     try {
       const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
       const q = [];
-      if (start) q.push('start=' + encodeURIComponent(start));
-      if (end) q.push('end=' + encodeURIComponent(end));
+      // Send explicit UTC range to avoid client/server timezone mismatches.
+      if (start) q.push('start=' + encodeURIComponent(start + 'T00:00:00Z'));
+      if (end) q.push('end=' + encodeURIComponent(end + 'T23:59:59Z'));
       const url = (base || '') + '/api/time/logs' + (q.length ? ('?' + q.join('&')) : '');
       const res = await fetch(url);
       const wrap = document.getElementById('reportTableWrap'); wrap.innerHTML = '';

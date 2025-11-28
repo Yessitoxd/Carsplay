@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const TimeLogSchema = new mongoose.Schema({
+  clientId: { type: String }, // optional client-generated id for idempotency
   stationId: { type: String },
   stationNumber: { type: Number },
   stationName: { type: String },
@@ -14,5 +15,6 @@ const TimeLogSchema = new mongoose.Schema({
 });
 
 TimeLogSchema.index({ start: 1 });
+TimeLogSchema.index({ clientId: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('TimeLog', TimeLogSchema);

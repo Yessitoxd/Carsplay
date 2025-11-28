@@ -33,10 +33,27 @@
   </main>
 </body>
   <script>
-    // Default API base: deployed CarsPlay service. Can be overridden by setting window.API_BASE before this script runs.
-    if (!window.API_BASE) {
-      window.API_BASE = 'https://carsplay.onrender.com';
-    }
+      // Default API base behavior:
+      // - If `window.API_BASE` is explicitly provided (e.g. injected by deployment), keep it.
+      // - If running on localhost (dev), use the local origin so you can test locally.
+      // - Otherwise (production / Netlify), default to the Render backend.
+      if (!window.API_BASE) {
+        const HOST_RENDER = 'https://carsplay.onrender.com';
+        try {
+          const host = (window.location && window.location.hostname) ? window.location.hostname : '';
+          if (host === 'localhost' || host === '127.0.0.1') {
+            window.API_BASE = window.location.origin;
+          } else if (window.location && window.location.protocol === 'file:') {
+            window.API_BASE = 'http://localhost:3000';
+          } else {
+            // Default to Render production backend for deployed frontends
+            window.API_BASE = HOST_RENDER;
+          }
+        } catch (e) {
+          window.API_BASE = HOST_RENDER;
+        }
+      }
+      console.info('Using API base:', window.API_BASE);
   </script>
   <script src="login.js"></script>
 </body>

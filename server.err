@@ -1,0 +1,1 @@
+MONGODB_URI not set — MongoDB connection skipped. Backend will run but DB operations will fail until MONGODB_URI is provided.
