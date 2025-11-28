@@ -419,8 +419,19 @@ app.get('/health', (req, res) => {
     const dbState = (mongoose && mongoose.connection) ? mongoose.connection.readyState : 0;
     // mongoose readyState: 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
     const dbConnected = dbState === 1;
+    // Log health checks (timestamp, client IP, ua, dbState)
+    try {
+      const ip = req.headers['x-forwarded-for'] || req.socket && req.socket.remoteAddress || req.ip || 'unknown';
+      const ua = req.headers['user-agent'] || 'unknown';
+      console.log(`[health] ${new Date().toISOString()} ip=${ip} dbState=${dbState} ua="${String(ua).replace(/\"/g,'') }"`);
+    } catch (e) { /* ignore logging errors */ }
+    if (!dbConnected) {
+      // Return 503 to indicate degraded state (DB required)
+      return res.status(503).json({ ok: false, time: new Date().toISOString(), dbConnected, dbState, error: 'db_not_connected' });
+    }
     return res.status(200).json({ ok: true, time: new Date().toISOString(), dbConnected, dbState });
   } catch (e) {
+    console.error('health check failed', e && e.stack || e);
     return res.status(500).json({ ok: false, error: 'health_check_failed' });
   }
 });
