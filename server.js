@@ -9,6 +9,7 @@ const User = require('./models/user');
 const Station = require('./models/station');
 const TimeRate = require('./models/timeRate');
 const TimeLog = require('./models/timeLog');
+const ExcelJS = require('exceljs');
 
 const app = express();
 const fs = require('fs');
@@ -402,6 +403,126 @@ app.get('/api/uploads/:id', async (req, res) => {
 });
 
 app.get('/', (req, res) => res.json({ ok: true, message: 'CarsPlay Auth Service' }));
+
+// Generate XLSX report using template 'Reporte Plantilla.xlsx'
+app.get('/api/time/report.xlsx', async (req, res) => {
+  try {
+    const q = req.query || {};
+    // parse start/end as in logs endpoint
+    let startDate = q.start ? new Date(q.start) : null;
+    let endDate = q.end ? new Date(q.end) : null;
+    if (!startDate) {
+      const now = new Date(); startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0,0,0,0);
+    }
+    if (!endDate) {
+      const now = new Date(); endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23,59,59,999);
+    }
+    // build filter
+    const filter = { start: { $gte: startDate, $lte: endDate } };
+    if (q.stationId) filter.stationId = q.stationId;
+    if (q.stationNumber) filter.stationNumber = Number(q.stationNumber);
+
+    // fetch logs sorted by start (order of use)
+    const logs = (mongoose.connection && mongoose.connection.readyState === 1)
+      ? await TimeLog.find(filter).sort({ start: 1 }).exec()
+      : (IN_MEMORY_LOGS || []).filter(l => {
+        const t = new Date(l.start).getTime();
+        if (t < startDate.getTime() || t > endDate.getTime()) return false;
+        if (q.stationId && String(l.stationId) !== String(q.stationId)) return false;
+        if (q.stationNumber && Number(l.stationNumber) !== Number(q.stationNumber)) return false;
+        return true;
+      }).sort((a,b)=>new Date(a.start)-new Date(b.start));
+
+    // load template
+    const tplPath = path.join(__dirname, 'Reporte Plantilla.xlsx');
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(tplPath);
+    const ws = wb.worksheets[0];
+
+    // Build report title in H4: single date or range
+    const fmtDate = (d) => {
+      const dd = String(d.getDate()).padStart(2,'0');
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const yyyy = d.getFullYear();
+      return `${dd}-${mm}-${yyyy}`;
+    };
+    const sLocal = new Date(startDate);
+    const eLocal = new Date(endDate);
+    const title = (fmtDate(sLocal) === fmtDate(eLocal)) ? fmtDate(sLocal) : `${fmtDate(sLocal)} al ${fmtDate(eLocal)}`;
+    // write title to H4 (column 8 row 4)
+    ws.getCell('H4').value = title;
+
+    // compute totals
+    let totalAmount = 0; let totalSeconds = 0; let totalsCount = 0; let rowIdx = 13; // headers are at row 12
+    for (const r of logs){
+      const start = new Date(r.start);
+      const end = new Date(r.end);
+      const duration = r.duration !== undefined ? Number(r.duration) : Math.max(0, Math.floor((end.getTime()-start.getTime())/1000));
+      totalAmount += Number(r.amount) || 0;
+      totalSeconds += duration;
+      totalsCount += 1;
+      // columns B..I => B date, C empleado, D estación, E dinero, F tiempo, G inicio, H fin, I comentario
+      const dateStr = start ? `${String(start.getDate()).padStart(2,'0')}-${String(start.getMonth()+1).padStart(2,'0')}-${start.getFullYear()}` : '';
+      const emp = r.username || '';
+      const est = r.stationName ? (r.stationName + (r.stationNumber ? ' #' + r.stationNumber : '')) : (r.stationNumber ? ('#'+r.stationNumber) : '');
+      const money = Number(r.amount) || 0;
+      // format time per rule: if <60 minutes show minutes, else H h M m
+      const mins = Math.floor(duration/60);
+      let timeLabel = '';
+      if (mins < 60) timeLabel = `${mins} m`; else { const h = Math.floor(mins/60); const m = mins%60; timeLabel = `${h} h` + (m ? ` ${m} m` : ''); }
+      const startTime = start.toLocaleTimeString('en-GB');
+      const endTime = end.toLocaleTimeString('en-GB');
+      const comment = r.comment || '';
+
+      ws.getCell('B' + rowIdx).value = dateStr;
+      ws.getCell('C' + rowIdx).value = emp;
+      ws.getCell('D' + rowIdx).value = est;
+      ws.getCell('E' + rowIdx).value = money;
+      ws.getCell('F' + rowIdx).value = timeLabel;
+      ws.getCell('G' + rowIdx).value = startTime;
+      ws.getCell('H' + rowIdx).value = endTime;
+      ws.getCell('I' + rowIdx).value = comment;
+      rowIdx++;
+    }
+
+    // After the detailed rows, add a horizontal summary row under the same columns
+    // (Estación -> D, Dinero -> E, Tiempo -> F)
+    try {
+      const summaryRow = rowIdx + 1; // leave one empty row after data for visual separation
+      // D -> total uses (e.g. "12 vueltas")
+      ws.getCell('D' + summaryRow).value = `${totalsCount} vueltas`;
+      // E -> total amount
+      ws.getCell('E' + summaryRow).value = totalAmount;
+      // F -> total time formatted
+      const totalMins2 = Math.floor(totalSeconds/60);
+      let totTimeLabel2 = '';
+      if (totalMins2 < 60) totTimeLabel2 = `${totalMins2} m`; else { const h2 = Math.floor(totalMins2/60); const m2 = totalMins2%60; totTimeLabel2 = `${h2} h` + (m2 ? ` ${m2} m` : ''); }
+      ws.getCell('F' + summaryRow).value = totTimeLabel2;
+    } catch (e) {
+      console.warn('Could not write summary row to XLSX', e && e.message);
+    }
+
+    // write totals: gains in G7? user wanted ganancias response in G7 and label in F7
+    ws.getCell('G7').value = totalAmount;
+
+    // write totals time in F? The user said 'Reporte del día está en F4 -> answer in H4' and 'Ganancias del dia esta en f7 -> respuesta en g7'
+    // additionally we can write total time in F? but user asked totals displayed in sheet under Tiempo column. We'll also set cell F7 to formatted total time.
+    const totalMins = Math.floor(totalSeconds/60);
+    let totTimeLabel = '';
+    if (totalMins < 60) totTimeLabel = `${totalMins} m`; else { const h = Math.floor(totalMins/60); const m = totalMins%60; totTimeLabel = `${h} h` + (m ? ` ${m} m` : ''); }
+    ws.getCell('F7').value = totTimeLabel;
+
+    // send workbook as attachment
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    const sname = (fmtDate(sLocal) === fmtDate(eLocal)) ? `Reporte ${fmtDate(sLocal)}.xlsx` : `Reporte del ${fmtDate(sLocal)} al ${fmtDate(eLocal)}.xlsx`;
+    res.setHeader('Content-Disposition', `attachment; filename="${sname.replace(/\s+/g,'_')}"`);
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (e) {
+    console.error('Generate XLSX error', e);
+    return res.status(500).json({ ok: false, error: 'report_generation_failed' });
+  }
+});
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Server listening on port ${port}`));

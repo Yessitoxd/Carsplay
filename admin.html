@@ -33,8 +33,16 @@
 
         <div id="section-download" class="admin-section" style="display:none">
           <h2>Descargar Reporte</h2>
-          <p>Pulsa para descargar un CSV con los registros de tiempo.</p>
-          <button id="downloadReport" class="btn primary">Descargar CSV</button>
+          <p>Selecciona rango y estación, luego pulsa para descargar un archivo XLSX con el reporte.</p>
+          <div class="download-controls" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <label for="downloadStart">Desde:</label>
+            <input id="downloadStart" type="date">
+            <label for="downloadEnd">Hasta:</label>
+            <input id="downloadEnd" type="date">
+            <label for="downloadStation">Estación:</label>
+            <select id="downloadStation"><option value="">Todas</option></select>
+          </div>
+          <button id="downloadReport" class="btn primary">Descargar XLSX</button>
         </div>
 
         <div id="section-addCarritos" class="admin-section" style="display:none">

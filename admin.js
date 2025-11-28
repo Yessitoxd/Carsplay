@@ -254,22 +254,84 @@
   async function downloadReport(){
     try {
       const base = window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '';
-      const res = await fetch((base || '') + '/api/time/logs');
-      if (!res.ok) { alert('No se pudo obtener el reporte'); return; }
-      const data = await res.json();
-      // convert to CSV simple
-      const csv = [];
-      if (Array.isArray(data)){
-        csv.push('username,stationId,start,end,duration_minutes');
-        data.forEach(r => {
-          csv.push(`${r.username || ''},${r.stationId || ''},${r.start || ''},${r.end || ''},${r.duration || ''}`);
-        });
+      // prefer dedicated download inputs if present, otherwise fallback to report inputs
+      const startInput = document.getElementById('downloadStart') || document.getElementById('reportStart');
+      const endInput = document.getElementById('downloadEnd') || document.getElementById('reportEnd');
+      const stationSelect = document.getElementById('downloadStation');
+      const start = startInput ? startInput.value : null;
+      const end = endInput ? endInput.value : null;
+      const q = [];
+      if (start) {
+        const sLocal = new Date(start + 'T00:00:00');
+        q.push('start=' + encodeURIComponent(new Date(sLocal.getTime()).toISOString()));
       }
-      const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = 'report.csv'; a.click();
-      URL.revokeObjectURL(url);
-    } catch (e){ console.error(e); alert('Error al descargar reporte'); }
+      if (end) {
+        const eLocal = new Date(end + 'T23:59:59');
+        q.push('end=' + encodeURIComponent(new Date(eLocal.getTime()).toISOString()));
+      }
+      if (stationSelect && stationSelect.value) {
+        // stationSelect stores stationId in option value when available, otherwise empty
+        q.push('stationId=' + encodeURIComponent(stationSelect.value));
+      }
+      const url = (base || '') + '/api/time/report.xlsx' + (q.length ? ('?' + q.join('&')) : '');
+
+      // Use fetch so we can show friendly errors and support auth headers in future
+      const headers = {};
+      const token = localStorage.getItem('carsplay_token');
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      const res = await fetch(url, { headers });
+      if (!res.ok) {
+        let body = null;
+        try { body = await res.json(); } catch(e) { body = await res.text().catch(()=>null); }
+        console.error('Report download failed', res.status, body);
+        showToast('No se pudo generar el XLSX (' + res.status + ')', 4000, 'error');
+        // If server doesn't provide XLSX endpoint (404), attempt fallback: fetch logs and generate CSV locally
+        if (res.status === 404) {
+          try {
+            showToast('Intentando descarga fallback (CSV)...', 3000, 'warning');
+            const logsUrl = (base || '') + '/api/time/logs' + (q.length ? ('?' + q.join('&')) : '');
+            const logsRes = await fetch(logsUrl, { headers });
+            if (!logsRes.ok) { showToast('Fallback también falló: ' + logsRes.status, 4000, 'error'); return; }
+            const data = await logsRes.json();
+            // build CSV
+            const csv = [];
+            csv.push('Fecha,Empleado,Estación,Dinero,Tiempo(min),Inicio,Fin,Comentario');
+            if (Array.isArray(data)){
+              data.forEach(r => {
+                const s = new Date(r.start || '');
+                const dateStr = isNaN(s) ? '' : `${String(s.getDate()).padStart(2,'0')}-${String(s.getMonth()+1).padStart(2,'0')}-${s.getFullYear()}`;
+                const startTime = r.start ? new Date(r.start).toLocaleTimeString() : '';
+                const endTime = r.end ? new Date(r.end).toLocaleTimeString() : '';
+                const durationMins = r.duration ? Math.floor(Number(r.duration)/60) : '';
+                const est = r.stationName ? (r.stationName + (r.stationNumber ? ' #' + r.stationNumber : '')) : (r.stationNumber ? ('#'+r.stationNumber) : '');
+                const row = [dateStr, (r.username||''), est, (Number(r.amount)||0), durationMins, startTime, endTime, (r.comment||'')];
+                // escape commas
+                csv.push(row.map(c=>('"'+String(c).replace(/"/g,'""')+'"')).join(','));
+              });
+            }
+            const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+            const urlBlob = URL.createObjectURL(blob);
+            const a2 = document.createElement('a'); a2.href = urlBlob; a2.download = 'reporte_fallback.csv'; document.body.appendChild(a2); a2.click(); a2.remove(); URL.revokeObjectURL(urlBlob);
+            showToast('Descarga fallback (CSV) completada', 3000, 'success');
+          } catch (e2) {
+            console.error('Fallback CSV generation failed', e2);
+            showToast('No se pudo generar reporte (fallback falló)', 4000, 'error');
+          }
+        }
+        return;
+      }
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      const blobUrl = URL.createObjectURL(blob);
+      // try to read suggested filename from Content-Disposition
+      let filename = 'reporte.xlsx';
+      const cd = res.headers.get('Content-Disposition') || res.headers.get('content-disposition');
+      if (cd) {
+        const m = cd.match(/filename\*=UTF-8''([^;\n\r]+)/i) || cd.match(/filename="?([^";]+)"?/i);
+        if (m && m[1]) filename = decodeURIComponent(m[1].replace(/"/g,''));
+      }
+      a.href = blobUrl; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(blobUrl);
+    } catch (e){ console.error(e); showToast && showToast('Error al descargar reporte', 3000, 'error'); }
   }
 
   async function populatePriceEditor(){
@@ -410,6 +472,19 @@
             loadReport(sVal, eVal, stationFilter);
           });
         });
+        // Also populate download selector if present
+        try {
+          const dsel = document.getElementById('downloadStation');
+          if (dsel) {
+            // clear but keep default
+            const cur = dsel.value || '';
+            dsel.innerHTML = '<option value="">Todas</option>';
+            stations.forEach(s => {
+              const opt = document.createElement('option'); opt.value = s._id || ''; opt.textContent = `${s.name || 'Carrito'} (#${s.number || '-'})`; dsel.appendChild(opt);
+            });
+            try { dsel.value = cur; } catch(e){}
+          }
+        } catch(e) { console.warn('download selector populate failed', e); }
       } catch(e){ console.warn('stations scroller failed', e); }
     })();
 

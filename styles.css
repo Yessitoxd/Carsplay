@@ -212,6 +212,18 @@ body.admin-auth .card{border-radius:12px}
 /* Ensure primary buttons are rounded in admin views */
 .admin-section .btn.primary{border-radius:12px}
 
+/* Download panel inputs (rounded, accented) */
+.download-controls input[type="date"], .download-controls select{
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid rgba(107,70,255,0.14);
+  background: linear-gradient(180deg,#fff,#fbfbff);
+  box-shadow: 0 6px 18px rgba(107,70,255,0.04);
+  font-weight:600;
+}
+.download-controls label{font-weight:600;color:var(--muted);margin-right:6px}
+.download-controls select{min-width:160px}
+
 /* Admin panel layout */
 .admin-shell{display:flex;gap:18px;align-items:stretch}
 .admin-sidebar{width:220px;background:transparent}
