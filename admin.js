@@ -274,6 +274,11 @@
         const de = `${String(eLocal.getDate()).padStart(2,'0')}-${String(eLocal.getMonth()+1).padStart(2,'0')}-${eLocal.getFullYear()}`;
         q.push('labelEnd=' + encodeURIComponent(de));
       }
+      // include timezone offset (minutes) so server can format times to user's local time
+      try {
+        const tz = new Date().getTimezoneOffset();
+        q.push('tzOffset=' + encodeURIComponent(String(tz)));
+      } catch(e) {}
       if (stationSelect && stationSelect.value) {
         // stationSelect stores stationId in option value when available, otherwise empty
         q.push('stationId=' + encodeURIComponent(stationSelect.value));

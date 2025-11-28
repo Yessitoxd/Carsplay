@@ -478,6 +478,12 @@ app.get('/api/time/report.xlsx', async (req, res) => {
     await wb.xlsx.readFile(tplPath);
     const ws = wb.worksheets[0];
 
+    // expose Content-Disposition header for CORS so frontends can read filename
+    try { res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition'); } catch(e){}
+
+    // timezone offset (minutes) sent by client; used to format dates/times in user's local zone
+    const tzOffset = q.tzOffset ? Number(q.tzOffset) : null;
+
     // Build report title in H4: single date or range
     const fmtDate = (d) => {
       const dd = String(d.getDate()).padStart(2,'0');
@@ -509,7 +515,14 @@ app.get('/api/time/report.xlsx', async (req, res) => {
       totalSeconds += duration;
       totalsCount += 1;
       // columns B..I => B date, C empleado, D estación, E dinero, F tiempo, G inicio, H fin, I comentario
-      const dateStr = start ? `${String(start.getDate()).padStart(2,'0')}-${String(start.getMonth()+1).padStart(2,'0')}-${start.getFullYear()}` : '';
+      // adjust to client's local time if tzOffset provided
+      let adjStart = start;
+      let adjEnd = end;
+      if (typeof tzOffset === 'number') {
+        try { adjStart = new Date(start.getTime() - (tzOffset * 60000)); } catch(e){}
+        try { adjEnd = new Date(end.getTime() - (tzOffset * 60000)); } catch(e){}
+      }
+      const dateStr = adjStart ? `${String(adjStart.getDate()).padStart(2,'0')}-${String(adjStart.getMonth()+1).padStart(2,'0')}-${adjStart.getFullYear()}` : '';
       const emp = r.username || '';
       const est = r.stationName ? (r.stationName + (r.stationNumber ? ' #' + r.stationNumber : '')) : (r.stationNumber ? ('#'+r.stationNumber) : '');
       const money = Number(r.amount) || 0;
@@ -517,8 +530,8 @@ app.get('/api/time/report.xlsx', async (req, res) => {
       const mins = Math.floor(duration/60);
       let timeLabel = '';
       if (mins < 60) timeLabel = `${mins} m`; else { const h = Math.floor(mins/60); const m = mins%60; timeLabel = `${h} h` + (m ? ` ${m} m` : ''); }
-      const startTime = start.toLocaleTimeString('en-GB');
-      const endTime = end.toLocaleTimeString('en-GB');
+      const startTime = adjStart.toTimeString ? adjStart.toTimeString().split(' ')[0] : (adjStart.toLocaleTimeString ? adjStart.toLocaleTimeString('en-GB') : '');
+      const endTime = adjEnd.toTimeString ? adjEnd.toTimeString().split(' ')[0] : (adjEnd.toLocaleTimeString ? adjEnd.toLocaleTimeString('en-GB') : '');
       const comment = r.comment || '';
 
       ws.getCell('B' + rowIdx).value = dateStr;
