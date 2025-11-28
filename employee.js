@@ -661,8 +661,8 @@
 
     logoutBtn.addEventListener('click', () => {
       localStorage.removeItem(USER_KEY);
-      // keep timer state persisted, but navigate to login
-      window.location.href = (window.API_BASE ? window.API_BASE.replace(/\/$/, '') : '') + '/index.html';
+      // keep timer state persisted, but navigate to frontend login (same origin)
+      window.location.href = '/index.html';
     });
   }
 
